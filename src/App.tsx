@@ -75,12 +75,29 @@ export default function App() {
   const [editingItem, setEditingItem] = useState<CostItem | null>(null);
   const [editingPackage, setEditingPackage] = useState<CostPackage | null>(null);
 
+  const [isLoading, setIsLoading] = useState(true);
+
   // --- 초기 데이터 로드 ---
   useEffect(() => {
-    setProjects(StorageAPI.getProjects());
-    setLibraryItems(StorageAPI.getCostItems());
-    setLibraryPackages(StorageAPI.getCostPackages());
-    setVendorInfo(StorageAPI.getVendorInfo());
+    async function initLoad() {
+      try {
+        setIsLoading(true);
+        const projs = await StorageAPI.getProjects();
+        const items = await StorageAPI.getCostItems();
+        const pkgs = await StorageAPI.getCostPackages();
+        const vendor = await StorageAPI.getVendorInfo();
+        
+        setProjects(projs);
+        setLibraryItems(items);
+        setLibraryPackages(pkgs);
+        setVendorInfo(vendor);
+      } catch (e) {
+        console.error('데이터 동기화 로딩 실패:', e);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    initLoad();
   }, []);
 
   // --- 현재 선택된 프로젝트 정보 ---
@@ -89,24 +106,14 @@ export default function App() {
   }, [projects, selectedProjectId]);
 
   // --- 데이터 변경 시 저장 핸들러 ---
-  const updateProjectsState = (newProjects: EstimateProject[]) => {
+  const updateProjectsState = async (newProjects: EstimateProject[]) => {
     setProjects(newProjects);
-    StorageAPI.saveProjects(newProjects);
-  };
-
-  const updateLibraryItemsState = (newItems: CostItem[]) => {
-    setLibraryItems(newItems);
-    StorageAPI.saveCostItems(newItems);
-  };
-
-  const updateLibraryPackagesState = (newPackages: CostPackage[]) => {
-    setLibraryPackages(newPackages);
-    StorageAPI.saveCostPackages(newPackages);
+    await StorageAPI.saveProjects(newProjects);
   };
 
   // --- 견적서 프로젝트 CRUD ---
-  const handleCreateNewProject = (type: 'IT' | 'DESIGN' | 'BUILD' | 'OTHER') => {
-    const defaultVendor = StorageAPI.getVendorInfo();
+  const handleCreateNewProject = async (type: 'IT' | 'DESIGN' | 'BUILD' | 'OTHER') => {
+    const defaultVendor = await StorageAPI.getVendorInfo();
     
     // 타입별 최적화된 초기 섹션 셋업
     let initialSections: EstimateSection[] = [];
@@ -533,9 +540,9 @@ export default function App() {
   }, [activeProject]);
 
   // --- 설정 (공급자 정보) 저장 ---
-  const handleSaveVendorInfo = (e: React.FormEvent) => {
+  const handleSaveVendorInfo = async (e: React.FormEvent) => {
     e.preventDefault();
-    StorageAPI.saveVendorInfo(vendorInfo);
+    await StorageAPI.saveVendorInfo(vendorInfo);
     alert('사내 정보가 성공적으로 저장되었습니다.');
     
     if (activeProject) {
@@ -555,8 +562,8 @@ export default function App() {
   };
 
   // --- 백업 복구 액션 ---
-  const handleExportData = () => {
-    const dataStr = StorageAPI.exportData();
+  const handleExportData = async () => {
+    const dataStr = await StorageAPI.exportData();
     const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
     const exportFileDefaultName = `estimate_backup_${new Date().toISOString().split('T')[0]}.json`;
     const linkElement = document.createElement('a');
@@ -565,13 +572,13 @@ export default function App() {
     linkElement.click();
   };
 
-  const handleImportData = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImportData = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onload = (event) => {
+      reader.onload = async (event) => {
         const result = event.target?.result as string;
-        if (StorageAPI.importData(result)) {
+        if (await StorageAPI.importData(result)) {
           alert('데이터가 성공적으로 복원되었습니다.');
           window.location.reload();
         } else {
@@ -583,7 +590,7 @@ export default function App() {
   };
 
   // --- 항목 라이브러리 CRUD (Library Tab) ---
-  const handleSaveCostItem = (item: CostItem | CostItem[]) => {
+  const handleSaveCostItem = async (item: CostItem | CostItem[]) => {
     let updated: CostItem[] = [...libraryItems];
     if (Array.isArray(item)) {
       // 5대 등급 일괄 저장 처리
@@ -597,20 +604,22 @@ export default function App() {
         updated = [item, ...updated];
       }
     }
-    updateLibraryItemsState(updated);
+    setLibraryItems(updated);
+    await StorageAPI.saveCostItem(item);
     setIsItemCreateModalOpen(false);
     setEditingItem(null);
   };
 
-  const handleDeleteCostItem = (id: string) => {
+  const handleDeleteCostItem = async (id: string) => {
     if (confirm('이 항목을 라이브러리에서 정말 삭제하시겠습니까? (이미 작성된 견적서에는 영향을 주지 않습니다)')) {
       const updated = libraryItems.filter(i => i.id !== id);
-      updateLibraryItemsState(updated);
+      setLibraryItems(updated);
+      await StorageAPI.deleteCostItem(id);
     }
   };
 
   // --- 패키지 라이브러리 CRUD (Library Tab) ---
-  const handleSaveCostPackage = (pkg: CostPackage) => {
+  const handleSaveCostPackage = async (pkg: CostPackage) => {
     const idx = libraryPackages.findIndex(p => p.id === pkg.id);
     let updated: CostPackage[];
     if (idx > -1) {
@@ -619,15 +628,17 @@ export default function App() {
     } else {
       updated = [pkg, ...libraryPackages];
     }
-    updateLibraryPackagesState(updated);
+    setLibraryPackages(updated);
+    await StorageAPI.saveCostPackage(pkg);
     setIsPackageCreateModalOpen(false);
     setEditingPackage(null);
   };
 
-  const handleDeleteCostPackage = (id: string) => {
+  const handleDeleteCostPackage = async (id: string) => {
     if (confirm('이 패키지를 라이브러리에서 정말 삭제하시겠습니까?')) {
       const updated = libraryPackages.filter(p => p.id !== id);
-      updateLibraryPackagesState(updated);
+      setLibraryPackages(updated);
+      await StorageAPI.deleteCostPackage(id);
     }
   };
 
@@ -727,6 +738,21 @@ export default function App() {
 
     return { hrItems, designOutputItems, devOutputItems, productionOutputItems, otherOutputItems };
   }, [libraryItems]);
+
+  if (isLoading) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', backgroundColor: '#f8f9fa', gap: '16px' }}>
+        <div style={{ width: '40px', height: '40px', border: '3px solid var(--border-color)', borderTopColor: 'var(--color-blue)', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+        <div style={{ fontSize: '14px', color: 'var(--text-secondary)', fontWeight: '600' }}>데이터베이스 실시간 동기화 중...</div>
+        <style>{`
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+        `}</style>
+      </div>
+    );
+  }
 
   return (
     <div className="app-container">

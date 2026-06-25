@@ -1,4 +1,5 @@
 import type { CostItem, CostPackage, EstimateProject, VendorInfo, EstimateRow } from '../types/estimate';
+import { supabase, isSupabaseConfigured } from './supabaseClient';
 
 // --- 초기 기본 데이터 (사내 표준 프리셋) ---
 
@@ -311,56 +312,126 @@ const KEYS = {
 };
 
 export const StorageAPI = {
-  getProjects(): EstimateProject[] {
+  // --- Projects (견적 프로젝트) CRUD ---
+  async getProjects(): Promise<EstimateProject[]> {
+    if (isSupabaseConfigured) {
+      try {
+        const { data, error } = await supabase
+          .from('estimate_projects')
+          .select('*')
+          .order('created_at', { ascending: false });
+        if (!error && data) {
+          localStorage.setItem(KEYS.PROJECTS, JSON.stringify(data));
+          return data as EstimateProject[];
+        }
+        console.error('[Supabase] getProjects error:', error);
+      } catch (e) {
+        console.error('[Supabase] getProjects network error:', e);
+      }
+    }
     const data = localStorage.getItem(KEYS.PROJECTS);
     if (!data) {
-      this.saveProjects(DEFAULT_PROJECTS);
+      await this.saveProjects(DEFAULT_PROJECTS);
       return DEFAULT_PROJECTS;
     }
     return JSON.parse(data);
   },
 
-  saveProjects(projects: EstimateProject[]): void {
+  async saveProjects(projects: EstimateProject[]): Promise<void> {
     localStorage.setItem(KEYS.PROJECTS, JSON.stringify(projects));
+    if (isSupabaseConfigured) {
+      try {
+        const { error } = await supabase
+          .from('estimate_projects')
+          .upsert(projects);
+        if (error) console.error('[Supabase] saveProjects error:', error);
+      } catch (e) {
+        console.error('[Supabase] saveProjects network error:', e);
+      }
+    }
   },
 
-  getProjectById(id: string): EstimateProject | undefined {
-    const projects = this.getProjects();
+  async getProjectById(id: string): Promise<EstimateProject | undefined> {
+    const projects = await this.getProjects();
     return projects.find(p => p.id === id);
   },
 
-  saveProject(project: EstimateProject): void {
-    const projects = this.getProjects();
+  async saveProject(project: EstimateProject): Promise<void> {
+    const projects = await this.getProjects();
     const idx = projects.findIndex(p => p.id === project.id);
     if (idx > -1) {
       projects[idx] = project;
     } else {
       projects.push(project);
     }
-    this.saveProjects(projects);
+    localStorage.setItem(KEYS.PROJECTS, JSON.stringify(projects));
+    
+    if (isSupabaseConfigured) {
+      try {
+        const { error } = await supabase
+          .from('estimate_projects')
+          .upsert(project);
+        if (error) console.error('[Supabase] saveProject error:', error);
+      } catch (e) {
+        console.error('[Supabase] saveProject network error:', e);
+      }
+    }
   },
 
-  deleteProject(id: string): void {
-    const projects = this.getProjects();
+  async deleteProject(id: string): Promise<void> {
+    const projects = await this.getProjects();
     const filtered = projects.filter(p => p.id !== id);
-    this.saveProjects(filtered);
+    localStorage.setItem(KEYS.PROJECTS, JSON.stringify(filtered));
+    
+    if (isSupabaseConfigured) {
+      try {
+        const { error } = await supabase
+          .from('estimate_projects')
+          .delete()
+          .eq('id', id);
+        if (error) console.error('[Supabase] deleteProject error:', error);
+      } catch (e) {
+        console.error('[Supabase] deleteProject network error:', e);
+      }
+    }
   },
 
-  getCostItems(): CostItem[] {
-    const data = localStorage.getItem(KEYS.COST_ITEMS);
-    if (!data) {
-      this.saveCostItems(DEFAULT_COST_ITEMS);
-      return DEFAULT_COST_ITEMS;
+  // --- CostItems (사내 기준 단가표) CRUD ---
+  async getCostItems(): Promise<CostItem[]> {
+    let items: CostItem[] = [];
+    let loadedFromSupabase = false;
+
+    if (isSupabaseConfigured) {
+      try {
+        const { data, error } = await supabase
+          .from('cost_items')
+          .select('*')
+          .order('created_at', { ascending: false });
+        if (!error && data) {
+          items = data as CostItem[];
+          loadedFromSupabase = true;
+        } else {
+          console.error('[Supabase] getCostItems error:', error);
+        }
+      } catch (e) {
+        console.error('[Supabase] getCostItems network error:', e);
+      }
+    }
+
+    if (!loadedFromSupabase) {
+      const data = localStorage.getItem(KEYS.COST_ITEMS);
+      if (!data) {
+        await this.saveCostItems(DEFAULT_COST_ITEMS);
+        return DEFAULT_COST_ITEMS;
+      }
+      items = JSON.parse(data) as CostItem[];
     }
     
-    const items = JSON.parse(data) as CostItem[];
-    
-    // 로컬스토리지 구버전 데이터 마이그레이션 보정 (단위 보정 및 레거시 비표준 등급 자동 정화)
+    // 구버전 데이터 마이그레이션 보정 엔진
     let needsUpdate = false;
     const migratedItems = items.map(item => {
       const currentItem = { ...item };
       
-      // 1. 카테고리 레거시 명칭 갱신
       if (currentItem.category === '인건비') {
         currentItem.category = '인건비 기준 (용역 공수)';
         needsUpdate = true;
@@ -390,14 +461,12 @@ export const StorageAPI = {
         needsUpdate = true;
       }
       
-      // 2. 단위 및 수식 보정
       if (['item-pm', 'item-designer', 'item-fe', 'item-be'].includes(currentItem.id) && currentItem.unit !== 'MD') {
         currentItem.unit = 'MD';
         currentItem.formulaType = 'PEOPLE_x_DAYS_x_PRICE';
         needsUpdate = true;
       }
 
-      // 3. 신규 5대 표준 등급 (Junior, Associate, Professional, Senior, Lead)으로 자동 마이그레이션
       if (currentItem.internalName) {
         let nameWithRank = currentItem.internalName;
         let rankChanged = false;
@@ -425,93 +494,224 @@ export const StorageAPI = {
       return currentItem;
     });
 
-    if (needsUpdate) {
-      this.saveCostItems(migratedItems);
-      return migratedItems;
+    if (needsUpdate || loadedFromSupabase) {
+      // 로컬 스토리지 상시 갱신
+      localStorage.setItem(KEYS.COST_ITEMS, JSON.stringify(migratedItems));
+      
+      // 마이그레이션 등으로 보정된 데이터를 Supabase에도 일괄 업서트
+      if (needsUpdate && isSupabaseConfigured) {
+        await this.saveCostItems(migratedItems);
+      }
     }
     
-    return items;
+    return migratedItems;
   },
 
-  saveCostItems(items: CostItem[]): void {
+  async saveCostItems(items: CostItem[]): Promise<void> {
     localStorage.setItem(KEYS.COST_ITEMS, JSON.stringify(items));
-  },
-
-  saveCostItem(item: CostItem): void {
-    const items = this.getCostItems();
-    const idx = items.findIndex(i => i.id === item.id);
-    if (idx > -1) {
-      items[idx] = item;
-    } else {
-      items.push(item);
+    if (isSupabaseConfigured) {
+      try {
+        const { error } = await supabase
+          .from('cost_items')
+          .upsert(items);
+        if (error) console.error('[Supabase] saveCostItems error:', error);
+      } catch (e) {
+        console.error('[Supabase] saveCostItems network error:', e);
+      }
     }
-    this.saveCostItems(items);
   },
 
-  deleteCostItem(id: string): void {
-    const items = this.getCostItems();
-    this.saveCostItems(items.filter(i => i.id !== id));
+  async saveCostItem(item: CostItem | CostItem[]): Promise<void> {
+    const items = await this.getCostItems();
+    let updated: CostItem[] = [...items];
+    
+    if (Array.isArray(item)) {
+      updated = [...item, ...updated];
+    } else {
+      const idx = items.findIndex(i => i.id === item.id);
+      if (idx > -1) {
+        updated[idx] = item;
+      } else {
+        updated = [item, ...updated];
+      }
+    }
+    
+    localStorage.setItem(KEYS.COST_ITEMS, JSON.stringify(updated));
+    
+    if (isSupabaseConfigured) {
+      try {
+        const payload = Array.isArray(item) ? item : [item];
+        const { error } = await supabase
+          .from('cost_items')
+          .upsert(payload);
+        if (error) console.error('[Supabase] saveCostItem error:', error);
+      } catch (e) {
+        console.error('[Supabase] saveCostItem network error:', e);
+      }
+    }
   },
 
-  getCostPackages(): CostPackage[] {
+  async deleteCostItem(id: string): Promise<void> {
+    const items = await this.getCostItems();
+    const filtered = items.filter(i => i.id !== id);
+    localStorage.setItem(KEYS.COST_ITEMS, JSON.stringify(filtered));
+    
+    if (isSupabaseConfigured) {
+      try {
+        const { error } = await supabase
+          .from('cost_items')
+          .delete()
+          .eq('id', id);
+        if (error) console.error('[Supabase] deleteCostItem error:', error);
+      } catch (e) {
+        console.error('[Supabase] deleteCostItem network error:', e);
+      }
+    }
+  },
+
+  // --- CostPackages (묶음 패키지 상품) CRUD ---
+  async getCostPackages(): Promise<CostPackage[]> {
+    if (isSupabaseConfigured) {
+      try {
+        const { data, error } = await supabase
+          .from('cost_packages')
+          .select('*')
+          .order('created_at', { ascending: false });
+        if (!error && data) {
+          localStorage.setItem(KEYS.COST_PACKAGES, JSON.stringify(data));
+          return data as CostPackage[];
+        }
+        console.error('[Supabase] getCostPackages error:', error);
+      } catch (e) {
+        console.error('[Supabase] getCostPackages network error:', e);
+      }
+    }
     const data = localStorage.getItem(KEYS.COST_PACKAGES);
     if (!data) {
-      this.saveCostPackages(DEFAULT_COST_PACKAGES);
+      await this.saveCostPackages(DEFAULT_COST_PACKAGES);
       return DEFAULT_COST_PACKAGES;
     }
     return JSON.parse(data);
   },
 
-  saveCostPackages(packages: CostPackage[]): void {
+  async saveCostPackages(packages: CostPackage[]): Promise<void> {
     localStorage.setItem(KEYS.COST_PACKAGES, JSON.stringify(packages));
+    if (isSupabaseConfigured) {
+      try {
+        const { error } = await supabase
+          .from('cost_packages')
+          .upsert(packages);
+        if (error) console.error('[Supabase] saveCostPackages error:', error);
+      } catch (e) {
+        console.error('[Supabase] saveCostPackages network error:', e);
+      }
+    }
   },
 
-  saveCostPackage(pkg: CostPackage): void {
-    const packages = this.getCostPackages();
+  async saveCostPackage(pkg: CostPackage): Promise<void> {
+    const packages = await this.getCostPackages();
     const idx = packages.findIndex(p => p.id === pkg.id);
     if (idx > -1) {
       packages[idx] = pkg;
     } else {
       packages.push(pkg);
     }
-    this.saveCostPackages(packages);
+    localStorage.setItem(KEYS.COST_PACKAGES, JSON.stringify(packages));
+    
+    if (isSupabaseConfigured) {
+      try {
+        const { error } = await supabase
+          .from('cost_packages')
+          .upsert(pkg);
+        if (error) console.error('[Supabase] saveCostPackage error:', error);
+      } catch (e) {
+        console.error('[Supabase] saveCostPackage network error:', e);
+      }
+    }
   },
 
-  deleteCostPackage(id: string): void {
-    const packages = this.getCostPackages();
-    this.saveCostPackages(packages.filter(p => p.id !== id));
+  async deleteCostPackage(id: string): Promise<void> {
+    const packages = await this.getCostPackages();
+    const filtered = packages.filter(p => p.id !== id);
+    localStorage.setItem(KEYS.COST_PACKAGES, JSON.stringify(filtered));
+    
+    if (isSupabaseConfigured) {
+      try {
+        const { error } = await supabase
+          .from('cost_packages')
+          .delete()
+          .eq('id', id);
+        if (error) console.error('[Supabase] deleteCostPackage error:', error);
+      } catch (e) {
+        console.error('[Supabase] deleteCostPackage network error:', e);
+      }
+    }
   },
 
-  getVendorInfo(): VendorInfo {
+  // --- VendorInfo (공급자 서명 설정) CRUD ---
+  async getVendorInfo(): Promise<VendorInfo> {
+    if (isSupabaseConfigured) {
+      try {
+        const { data, error } = await supabase
+          .from('vendor_info')
+          .select('*')
+          .eq('id', 'default_vendor')
+          .single();
+        if (!error && data) {
+          localStorage.setItem(KEYS.VENDOR_INFO, JSON.stringify(data));
+          return data as VendorInfo;
+        }
+        if (error && error.code === 'PGRST116') {
+          await this.saveVendorInfo(DEFAULT_VENDOR_INFO);
+          return DEFAULT_VENDOR_INFO;
+        }
+        console.error('[Supabase] getVendorInfo error:', error);
+      } catch (e) {
+        console.error('[Supabase] getVendorInfo network error:', e);
+      }
+    }
     const data = localStorage.getItem(KEYS.VENDOR_INFO);
     if (!data) {
-      this.saveVendorInfo(DEFAULT_VENDOR_INFO);
+      await this.saveVendorInfo(DEFAULT_VENDOR_INFO);
       return DEFAULT_VENDOR_INFO;
     }
     return JSON.parse(data);
   },
 
-  saveVendorInfo(info: VendorInfo): void {
+  async saveVendorInfo(info: VendorInfo): Promise<void> {
+    const payload = { id: 'default_vendor', ...info };
     localStorage.setItem(KEYS.VENDOR_INFO, JSON.stringify(info));
+    
+    if (isSupabaseConfigured) {
+      try {
+        const { error } = await supabase
+          .from('vendor_info')
+          .upsert(payload);
+        if (error) console.error('[Supabase] saveVendorInfo error:', error);
+      } catch (e) {
+        console.error('[Supabase] saveVendorInfo network error:', e);
+      }
+    }
   },
 
-  exportData(): string {
+  // --- 백업용 내보내기/가져오기 기능 ---
+  async exportData(): Promise<string> {
     const payload = {
-      projects: this.getProjects(),
-      costItems: this.getCostItems(),
-      costPackages: this.getCostPackages(),
-      vendorInfo: this.getVendorInfo()
+      projects: await this.getProjects(),
+      costItems: await this.getCostItems(),
+      costPackages: await this.getCostPackages(),
+      vendorInfo: await this.getVendorInfo()
     };
     return JSON.stringify(payload, null, 2);
   },
 
-  importData(jsonString: string): boolean {
+  async importData(jsonString: string): Promise<boolean> {
     try {
       const parsed = JSON.parse(jsonString);
-      if (parsed.projects) this.saveProjects(parsed.projects);
-      if (parsed.costItems) this.saveCostItems(parsed.costItems);
-      if (parsed.costPackages) this.saveCostPackages(parsed.costPackages);
-      if (parsed.vendorInfo) this.saveVendorInfo(parsed.vendorInfo);
+      if (parsed.projects) await this.saveProjects(parsed.projects);
+      if (parsed.costItems) await this.saveCostItems(parsed.costItems);
+      if (parsed.costPackages) await this.saveCostPackages(parsed.costPackages);
+      if (parsed.vendorInfo) await this.saveVendorInfo(parsed.vendorInfo);
       return true;
     } catch (e) {
       console.error(e);
