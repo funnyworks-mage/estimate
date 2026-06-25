@@ -1,6 +1,9 @@
 import React from 'react';
-import { X, Printer } from 'lucide-react';
+import { X, Printer, Download, Share2 } from 'lucide-react';
 import type { EstimateProject } from '../types/estimate';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
+import { supabase, isSupabaseConfigured } from '../utils/supabaseClient';
 
 // --- 한글 금액 변환 함수 ---
 function convertToKoreanAmount(num: number): string {
@@ -73,6 +76,9 @@ export default function EstimatePreviewModal({
   onClose,
   onPrint
 }: EstimatePreviewModalProps) {
+  const [isGeneratingPdf, setIsGeneratingPdf] = React.useState(false);
+  const [isSharing, setIsSharing] = React.useState(false);
+
   React.useEffect(() => {
     if (isOpen && activeProject) {
       const oldTitle = document.title;
@@ -87,6 +93,99 @@ export default function EstimatePreviewModal({
 
   const currencyInfo = CURRENCY_MAP[activeProject.foreignCurrency || 'EUR'] || CURRENCY_MAP.EUR;
 
+  const handleDownloadPdf = async () => {
+    const pages = document.querySelectorAll('.a4-page');
+    if (pages.length === 0) return;
+    setIsGeneratingPdf(true);
+    try {
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pdfWidth = 210;
+      const pdfHeight = 297;
+
+      for (let i = 0; i < pages.length; i++) {
+        const page = pages[i] as HTMLElement;
+        const canvas = await html2canvas(page, {
+          scale: 2,
+          useCORS: true,
+          logging: false
+        });
+        const imgData = canvas.toDataURL('image/png');
+        
+        if (i > 0) {
+          pdf.addPage();
+        }
+        pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      }
+      
+      const fileName = `${activeProject.title || '견적서'}.pdf`;
+      pdf.save(fileName);
+    } catch (error) {
+      console.error('PDF 생성 에러:', error);
+      alert('PDF 파일을 생성하는 데 실패했습니다. 일반 인쇄 방식을 이용바랍니다.');
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
+
+  const handleSharePdf = async () => {
+    if (!isSupabaseConfigured) {
+      alert('Supabase 연동이 활성화되지 않은 상태입니다.\n이 기능은 Supabase 서버가 연결된 상태에서 작동하며, 생성된 PDF 링크를 발급해 줍니다. 현재는 로컬 오프라인 모드입니다.');
+      return;
+    }
+    
+    const pages = document.querySelectorAll('.a4-page');
+    if (pages.length === 0) return;
+
+    setIsSharing(true);
+    try {
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pdfWidth = 210;
+      const pdfHeight = 297;
+
+      for (let i = 0; i < pages.length; i++) {
+        const page = pages[i] as HTMLElement;
+        const canvas = await html2canvas(page, {
+          scale: 2,
+          useCORS: true,
+          logging: false
+        });
+        const imgData = canvas.toDataURL('image/png');
+        
+        if (i > 0) {
+          pdf.addPage();
+        }
+        pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      }
+      
+      const pdfBlob = pdf.output('blob');
+      const fileExt = 'pdf';
+      const fileName = `${activeProject.id}_${Date.now()}.${fileExt}`;
+      const filePath = `estimates/${fileName}`;
+
+      const { error } = await supabase.storage
+        .from('estimate-pdfs')
+        .upload(filePath, pdfBlob, {
+          contentType: 'application/pdf',
+          cacheControl: '3600',
+          upsert: true
+        });
+
+      if (error) throw error;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('estimate-pdfs')
+        .getPublicUrl(filePath);
+
+      await navigator.clipboard.writeText(publicUrl);
+      alert('견적서 고화질 PDF 공유 링크가 클립보드에 복사되었습니다!\n원하는 곳에 붙여넣어 공유하세요.');
+    } catch (error: any) {
+      console.error('PDF 공유 에러:', error);
+      alert(`공유 링크 생성 실패: ${error.message || '알 수 없는 오류'}\nSupabase Storage에 "estimate-pdfs" 버킷이 Public 읽기 권한으로 생성되어 있는지 확인해주세요.`);
+    } finally {
+      setIsSharing(false);
+    }
+  };
+
   return (
     <div className="modal-overlay">
       <div className="modal-container large">
@@ -99,7 +198,13 @@ export default function EstimatePreviewModal({
             })
           </h2>
           <div style={{ display: 'flex', gap: '8px' }}>
-            <button type="button" className="btn btn-primary" onClick={onPrint}>
+            <button type="button" className="btn btn-secondary" onClick={handleDownloadPdf} disabled={isGeneratingPdf || isSharing}>
+              <Download size={16} /> {isGeneratingPdf ? 'PDF 생성 중...' : 'PDF 다운로드'}
+            </button>
+            <button type="button" className="btn btn-secondary" onClick={handleSharePdf} disabled={isGeneratingPdf || isSharing}>
+              <Share2 size={16} /> {isSharing ? '링크 생성 중...' : '공유 링크 복사'}
+            </button>
+            <button type="button" className="btn btn-primary" onClick={onPrint} disabled={isGeneratingPdf || isSharing}>
               <Printer size={16} /> 인쇄 및 PDF로 저장
             </button>
             <button type="button" className="btn btn-secondary btn-icon-only" onClick={onClose}>

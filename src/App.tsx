@@ -398,9 +398,10 @@ export default function App() {
   // --- 외화 환율 자동 조회 기능 ---
   const handleFetchAutoExchangeRate = async () => {
     if (!activeProject) return;
+    const fromCurr = activeProject.foreignCurrency || 'USD';
     const dateStr = activeProject.estimateDate || new Date().toISOString().split('T')[0];
     try {
-      const res = await fetch(`https://api.frankfurter.app/${dateStr}?from=EUR&to=KRW`);
+      const res = await fetch(`https://api.frankfurter.app/${dateStr}?from=${fromCurr}&to=KRW`);
       if (!res.ok) throw new Error('환율 정보 획득 실패');
       const data = await res.json();
       const rate = data.rates?.KRW;
@@ -412,20 +413,42 @@ export default function App() {
           return p;
         });
         updateProjectsState(updated);
-        alert(`발행일(${dateStr}) 기준 표준 고시환율(1 EUR = ${rate.toLocaleString()}원)이 자동 반영되었습니다.`);
+        alert(`발행일(${dateStr}) 기준 표준 고시환율(1 ${fromCurr} = ${rate.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}원)이 자동 반영되었습니다.`);
       }
     } catch (error) {
-      alert('환율 자동 조회 실패. 수동 기입바랍니다.');
+      // Frankfurter API 실패 시 open.er-api.com으로 폴백하여 최신 환율 반영
+      try {
+        const fallbackRes = await fetch(`https://open.er-api.com/v6/latest/${fromCurr}`);
+        if (fallbackRes.ok) {
+          const fallbackData = await fallbackRes.json();
+          const fallbackRate = fallbackData.rates?.KRW;
+          if (fallbackRate) {
+            const updated = projects.map(p => {
+              if (p.id === activeProject.id) {
+                return { ...p, exchangeRate: fallbackRate, exchangeRateSource: 'api' as const };
+              }
+              return p;
+            });
+            updateProjectsState(updated);
+            alert(`[폴백 적용] 최신 표준 고시환율(1 ${fromCurr} = ${fallbackRate.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}원)이 자동 반영되었습니다.`);
+            return;
+          }
+        }
+      } catch (e) {
+        console.error('폴백 환율 조회 실패:', e);
+      }
+      alert('환율 자동 조회에 실패했습니다. 네트워크 연결을 확인하거나 수동으로 기입바랍니다.');
     }
   };
 
-  // 외화 표기 활성화 혹은 발행일 변경 시 최초 환율 자동 조회
+  // 외화 표기 활성화 혹은 발행일/통화 종류 변경 시 최초 환율 자동 조회
   useEffect(() => {
     if (activeProject && activeProject.useForeignCurrency && !activeProject.exchangeRate) {
       const fetchInitialRate = async () => {
+        const fromCurr = activeProject.foreignCurrency || 'USD';
         const dateStr = activeProject.estimateDate || new Date().toISOString().split('T')[0];
         try {
-          const res = await fetch(`https://api.frankfurter.app/${dateStr}?from=EUR&to=KRW`);
+          const res = await fetch(`https://api.frankfurter.app/${dateStr}?from=${fromCurr}&to=KRW`);
           if (res.ok) {
             const data = await res.json();
             const rate = data.rates?.KRW;
@@ -437,15 +460,35 @@ export default function App() {
                 return p;
               });
               updateProjectsState(updated);
+              return;
             }
           }
+          throw new Error('Initial fetch failed');
         } catch (e) {
-          console.warn('최초 환율 자동 조회 실패:', e);
+          // 폴백 시도
+          try {
+            const fallbackRes = await fetch(`https://open.er-api.com/v6/latest/${fromCurr}`);
+            if (fallbackRes.ok) {
+              const fallbackData = await fallbackRes.json();
+              const fallbackRate = fallbackData.rates?.KRW;
+              if (fallbackRate) {
+                const updated = projects.map(p => {
+                  if (p.id === activeProject.id) {
+                    return { ...p, exchangeRate: fallbackRate, exchangeRateSource: 'api' as const };
+                  }
+                  return p;
+                });
+                updateProjectsState(updated);
+              }
+            }
+          } catch (err) {
+            console.warn('최초 환율 자동 조회 실패:', err);
+          }
         }
       };
       fetchInitialRate();
     }
-  }, [activeProject?.useForeignCurrency, activeProject?.estimateDate]);
+  }, [activeProject?.useForeignCurrency, activeProject?.estimateDate, activeProject?.foreignCurrency]);
 
   // 수동 입력한 청구 합계 금액을 프로젝트 상태에 정식 반영
   const handleApplyCustomAmount = () => {
