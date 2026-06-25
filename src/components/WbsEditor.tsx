@@ -1,6 +1,7 @@
 import React from 'react';
 import { Trash2, Plus, ArrowUp, ArrowDown, RefreshCw } from 'lucide-react';
 import type { WbsCategory, WbsTask } from '../types/estimate';
+import GanttChart from './GanttChart';
 
 interface WbsEditorProps {
   wbs: WbsCategory[];
@@ -669,6 +670,8 @@ export const WbsEditor: React.FC<WbsEditorProps> = ({ wbs, availableRoles, onCha
                 <th style={{ width: '125px' }}>역할군 연동</th>
                 <th style={{ width: '70px', textAlign: 'center' }}>투입인력</th>
                 <th style={{ width: '70px', textAlign: 'center' }}>투입일수</th>
+                <th style={{ width: '190px', textAlign: 'center' }}>작업 일정 (시작~종료)</th>
+                <th style={{ width: '70px', textAlign: 'center' }}>진척도</th>
                 <th style={{ width: '75px', textAlign: 'center' }}>작업 관리</th>
               </tr>
             </thead>
@@ -957,6 +960,43 @@ export const WbsEditor: React.FC<WbsEditorProps> = ({ wbs, availableRoles, onCha
                         />
                       </td>
 
+                      {/* 작업 일정 (시작일 / 종료일) */}
+                      <td>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <input 
+                            type="date"
+                            className="wbs-input-text"
+                            style={{ fontSize: '11px', padding: '3px 6px', height: '24px' }}
+                            value={task.startDate || ''}
+                            onChange={(e) => handleUpdateTaskField(cat.id, task.id, 'startDate', e.target.value)}
+                          />
+                          <input 
+                            type="date"
+                            className="wbs-input-text"
+                            style={{ fontSize: '11px', padding: '3px 6px', height: '24px' }}
+                            value={task.endDate || ''}
+                            onChange={(e) => handleUpdateTaskField(cat.id, task.id, 'endDate', e.target.value)}
+                          />
+                        </div>
+                      </td>
+
+                      {/* 진척도 (%) */}
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <input 
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="5"
+                            className="wbs-input-num"
+                            style={{ width: '48px' }}
+                            value={task.progress || 0}
+                            onChange={(e) => handleUpdateTaskField(cat.id, task.id, 'progress', Math.min(100, Math.max(0, Number(e.target.value))))}
+                          />
+                          <span style={{ fontSize: '10px', fontWeight: '600' }}>%</span>
+                        </div>
+                      </td>
+
                       {/* 작업 관리 삭제 액션 */}
                       <td style={{ textAlign: 'center', verticalAlign: 'middle' }}>
                         <div className="wbs-task-action-row">
@@ -1015,6 +1055,28 @@ export const WbsEditor: React.FC<WbsEditorProps> = ({ wbs, availableRoles, onCha
             >
               <Plus size={15} /> 대분류 항목 추가
             </button>
+          </div>
+
+          {/* WBS 공정관리 간트 차트 연동 렌더링 */}
+          <div style={{ marginTop: '40px', paddingTop: '30px', borderTop: '2px dashed var(--border-color)' }}>
+            <GanttChart 
+              wbs={wbs} 
+              onUpdateTask={(catId, taskId, fields) => {
+                const updated = wbs.map(cat => {
+                  if (cat.id === catId) {
+                    const tasks = cat.tasks.map(t => {
+                      if (t.id === taskId) {
+                        return { ...t, ...fields };
+                      }
+                      return t;
+                    });
+                    return { ...cat, tasks };
+                  }
+                  return cat;
+                });
+                onChange(updated);
+              }} 
+            />
           </div>
         </div>
       )}

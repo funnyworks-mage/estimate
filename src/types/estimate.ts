@@ -92,6 +92,9 @@ export interface WbsTask {
   md: number;               // 투입일수 (MD)
   role: string; // 연동할 역할군
   roles?: string[]; // 다중 역할군 연동 지원
+  startDate?: string;       // 시작일 (YYYY-MM-DD)
+  endDate?: string;         // 종료일 (YYYY-MM-DD)
+  progress?: number;        // 진척도 (0 ~ 100)
 }
 
 // WBS 대기능 / 항목 (대분류)
