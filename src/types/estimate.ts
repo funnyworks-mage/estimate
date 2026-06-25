@@ -134,6 +134,8 @@ export interface EstimateProject {
   foreignCurrency?: 'EUR' | 'USD' | 'JPY' | 'CNY'; // 표기 외화 종류 (EUR, USD, JPY, CNY 등)
   exchangeRate?: number;        // 적용 환율 (1 외화 = OOO KRW)
   exchangeRateSource?: 'manual' | 'api'; // 환율 입력 소스
+  billingDate?: string;         // 청구 예정일 (YYYY-MM-DD)
+  paymentDueDate?: string;      // 수금 예정일 (YYYY-MM-DD)
 }
 
 export interface CorrectionFactor {

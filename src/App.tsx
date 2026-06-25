@@ -16,7 +16,8 @@ import {
   Palette,
   Hammer,
   HelpCircle,
-  Building2
+  Building2,
+  Calendar
 } from 'lucide-react';
 import type { 
   CostItem, 
@@ -38,6 +39,7 @@ import LibraryImportModal from './components/LibraryImportModal';
 import PackageImportModal from './components/PackageImportModal';
 import SettingsTab from './components/SettingsTab';
 import EstimatePreviewModal from './components/EstimatePreviewModal';
+import ClientStatCalendar from './components/ClientStatCalendar';
 import { WbsEditor } from './components/WbsEditor';
 import ClientImportModal from './components/ClientImportModal';
 
@@ -52,7 +54,7 @@ const APP_RANK_MULTIPLIERS: Record<string, number> = {
 
 export default function App() {
   // --- 상태 관리 ---
-  const [activeTab, setActiveTab] = useState<'estimates' | 'library' | 'settings'>('estimates');
+  const [activeTab, setActiveTab] = useState<'estimates' | 'library' | 'settings' | 'calendar'>('estimates');
   
   // 데이터 상태
   const [projects, setProjects] = useState<EstimateProject[]>([]);
@@ -1567,6 +1569,13 @@ export default function App() {
             항목 라이브러리
           </div>
           <div 
+            className={`menu-item ${activeTab === 'calendar' ? 'active' : ''}`}
+            onClick={() => setActiveTab('calendar')}
+          >
+            <Calendar size={18} />
+            자금 일정 (캘린더)
+          </div>
+          <div 
             className={`menu-item ${activeTab === 'settings' ? 'active' : ''}`}
             onClick={() => setActiveTab('settings')}
           >
@@ -1952,6 +1961,24 @@ export default function App() {
                               className="input-text"
                               value={activeProject.expiryDate}
                               onChange={(e) => handleUpdateProjectField('expiryDate', e.target.value)}
+                            />
+                          </div>
+                          <div className="form-group">
+                            <label className="form-label">청구 예정일 (자금 계획용)</label>
+                            <input 
+                              type="date" 
+                              className="input-text"
+                              value={activeProject.billingDate || ''}
+                              onChange={(e) => handleUpdateProjectField('billingDate', e.target.value)}
+                            />
+                          </div>
+                          <div className="form-group">
+                            <label className="form-label">수금 예정일 (미수금 관리용)</label>
+                            <input 
+                              type="date" 
+                              className="input-text"
+                              value={activeProject.paymentDueDate || ''}
+                              onChange={(e) => handleUpdateProjectField('paymentDueDate', e.target.value)}
                             />
                           </div>
                         </div>
@@ -2518,6 +2545,26 @@ export default function App() {
               </>
             )
             )}
+          </div>
+        )}
+
+        {/* --- D. 자금 일정 (캘린더) 탭 --- */}
+        {activeTab === 'calendar' && (
+          <div className="workspace">
+            <div className="workspace-header">
+              <div>
+                <h1 className="workspace-title">자금 일정 및 수금 현황</h1>
+                <p className="workspace-subtitle">프로젝트별 청구 예정일과 수금 예정일을 캘린더에서 한눈에 조망하고 미수금을 실시간 추적합니다.</p>
+              </div>
+            </div>
+            <ClientStatCalendar 
+              projects={projects} 
+              onSelectProject={(projectId) => {
+                setSelectedProjectId(projectId);
+                setActiveTab('estimates');
+                setActiveSubTab('estimate');
+              }} 
+            />
           </div>
         )}
 
