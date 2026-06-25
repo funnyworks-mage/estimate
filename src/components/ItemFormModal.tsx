@@ -4,7 +4,6 @@ import type { CostItem, FormulaType, VatType } from '../types/estimate';
 
 interface ItemFormModalProps {
   item: CostItem | null;
-  categories: string[];
   onClose: () => void;
   onSave: (item: CostItem | CostItem[]) => void;
 }
@@ -69,21 +68,6 @@ const RANK_OPTIONS = [
   'Lead'
 ];
 
-// 자주 쓰이는 기본 단위 목록
-const DEFAULT_UNITS = [
-  'MD',
-  '일',
-  '시간',
-  'EA',
-  '개',
-  '잔',
-  '종',
-  '페이지',
-  '건',
-  '식',
-  '개월'
-];
-
 // 레거시 텍스트에서 등급을 파싱하는 헬퍼 함수
 function parseInitialRank(internalName: string, name: string): string {
   const fullText = `${internalName || ''} ${name || ''}`.toLowerCase();
@@ -95,21 +79,38 @@ function parseInitialRank(internalName: string, name: string): string {
   return '해당 없음';
 }
 
-export default function ItemFormModal({ item, categories, onClose, onSave }: ItemFormModalProps) {
+export default function ItemFormModal({ item, onClose, onSave }: ItemFormModalProps) {
   // --- [영구 재사용 저장소 로드] 사용자가 추가한 커스텀 카테고리, 항목명, 단위 상태 ---
-  const [customCategories, setCustomCategories] = useState<string[]>(() => {
-    const data = localStorage.getItem('estimate_custom_categories_v3');
-    return data ? JSON.parse(data) : [];
+  // 1. 카테고리 단일 통합 리스트 (최초 로드 시 기본 카테고리 자동 이식)
+  const [categoriesList, setCategoriesList] = useState<string[]>(() => {
+    const data = localStorage.getItem('estimate_notion_categories_v4');
+    if (data) return JSON.parse(data);
+    const initial = [
+      '인건비 기준 (용역 공수)',
+      '디자인 결과물 기준',
+      '개발 결과물 기준',
+      '생산 결과물 기준',
+      '기타 결과물 기준'
+    ];
+    localStorage.setItem('estimate_notion_categories_v4', JSON.stringify(initial));
+    return initial;
   });
 
-  const [customNames, setCustomNames] = useState<Record<string, string[]>>(() => {
-    const data = localStorage.getItem('estimate_custom_names_v3');
-    return data ? JSON.parse(data) : {};
+  // 2. 단위 단일 통합 리스트
+  const [unitsList, setUnitsList] = useState<string[]>(() => {
+    const data = localStorage.getItem('estimate_notion_units_v4');
+    if (data) return JSON.parse(data);
+    const initial = ['MD', '일', '시간', 'EA', '개', '잔', '종', '페이지', '건', '식', '개월'];
+    localStorage.setItem('estimate_notion_units_v4', JSON.stringify(initial));
+    return initial;
   });
 
-  const [customUnits, setCustomUnits] = useState<string[]>(() => {
-    const data = localStorage.getItem('estimate_custom_units_v3');
-    return data ? JSON.parse(data) : [];
+  // 3. 표준 항목명 단일 통합 리스트
+  const [namesList, setNamesList] = useState<Record<string, string[]>>(() => {
+    const data = localStorage.getItem('estimate_notion_names_v4');
+    if (data) return JSON.parse(data);
+    localStorage.setItem('estimate_notion_names_v4', JSON.stringify(DEFAULT_POPULAR_NAMES));
+    return DEFAULT_POPULAR_NAMES;
   });
 
   // --- E. 입력 제어 상태 ---
@@ -146,19 +147,19 @@ export default function ItemFormModal({ item, categories, onClose, onSave }: Ite
   }, [item]);
 
   // --- 로컬스토리지 싱크 유틸리티 ---
-  const saveCustomCategories = (newCats: string[]) => {
-    setCustomCategories(newCats);
-    localStorage.setItem('estimate_custom_categories_v3', JSON.stringify(newCats));
+  const saveCategoriesList = (newCats: string[]) => {
+    setCategoriesList(newCats);
+    localStorage.setItem('estimate_notion_categories_v4', JSON.stringify(newCats));
   };
 
-  const saveCustomNames = (newNames: Record<string, string[]>) => {
-    setCustomNames(newNames);
-    localStorage.setItem('estimate_custom_names_v3', JSON.stringify(newNames));
+  const saveNamesList = (newNames: Record<string, string[]>) => {
+    setNamesList(newNames);
+    localStorage.setItem('estimate_notion_names_v4', JSON.stringify(newNames));
   };
 
-  const saveCustomUnits = (newUnits: string[]) => {
-    setCustomUnits(newUnits);
-    localStorage.setItem('estimate_custom_units_v3', JSON.stringify(newUnits));
+  const saveUnitsList = (newUnits: string[]) => {
+    setUnitsList(newUnits);
+    localStorage.setItem('estimate_notion_units_v4', JSON.stringify(newUnits));
   };
 
   // --- [지능형 동기화 엔진] 카테고리 변경 시 매핑 및 항목명 자동 제안 ---
@@ -188,9 +189,7 @@ export default function ItemFormModal({ item, categories, onClose, onSave }: Ite
     }
 
     // 2단계: 카테고리에 할당된 첫 번째 표준 항목명으로 피딩
-    const systemNames = DEFAULT_POPULAR_NAMES[selectedCat] || [];
-    const userNames = customNames[selectedCat] || [];
-    const availableNames = [...systemNames, ...userNames];
+    const availableNames = namesList[selectedCat] || [];
     
     if (availableNames.length > 0) {
       setNameSelect(availableNames[0]);
@@ -266,26 +265,12 @@ export default function ItemFormModal({ item, categories, onClose, onSave }: Ite
     }
   };
 
-  // --- [드롭다운 옵션 집계 및 레거시 제거 필터] ---
-  const defaultCategories = [
-    '인건비 기준 (용역 공수)',
-    '디자인 결과물 기준',
-    '개발 결과물 기준',
-    '생산 결과물 기준',
-    '기타 결과물 기준'
-  ];
-
+  // 최종 노출할 카테고리 목록 (레거시 필터 및 단일 풀 바인딩)
   const LEGACY_CATEGORIES = ['인건비', '디자인', '개발비', '운영비', '식음료', '외주비', '직접 입력', 'new'];
+  const uniqueCategories = categoriesList.filter(cat => cat && !LEGACY_CATEGORIES.includes(cat));
 
-  // 최종 노출할 카테고리 목록 (기본 카테고리 + 레거시 제외 부모 카테고리)
-  const uniqueCategories = Array.from(new Set([
-    ...defaultCategories,
-    ...categories.filter(cat => cat && !LEGACY_CATEGORIES.includes(cat) && !defaultCategories.includes(cat))
-  ]));
-
-  // 최종 노출할 항목명 목록 (시스템 기본 목록 + 사용자가 추가한 항목명 목록)
-  const systemNames = DEFAULT_POPULAR_NAMES[category] || [];
-  const userNames = customNames[category] || [];
+  // 최종 노출할 항목명 목록 (해당 카테고리의 단일 풀 바인딩)
+  const availableNames = namesList[category] || [];
 
   const isHR = category.includes('인건비');
 
@@ -425,19 +410,20 @@ export default function ItemFormModal({ item, categories, onClose, onSave }: Ite
               <NotionDropdown 
                 value={category}
                 options={uniqueCategories}
-                customOptions={customCategories}
                 onSelect={(val) => handleCategoryChange(val)}
                 onAddOption={(newVal) => {
-                  if (!customCategories.includes(newVal)) {
-                    saveCustomCategories([...customCategories, newVal]);
+                  if (!categoriesList.includes(newVal)) {
+                    const updated = [...categoriesList, newVal];
+                    saveCategoriesList(updated);
                   }
                   handleCategoryChange(newVal);
                 }}
                 onDeleteOption={(delVal) => {
-                  const filtered = customCategories.filter(c => c !== delVal);
-                  saveCustomCategories(filtered);
+                  const filtered = categoriesList.filter(c => c !== delVal);
+                  saveCategoriesList(filtered);
                   if (category === delVal) {
-                    handleCategoryChange(defaultCategories[0]);
+                    const fallback = filtered.length > 0 ? filtered[0] : '';
+                    handleCategoryChange(fallback);
                   }
                 }}
                 placeholder="카테고리 선택 및 추가"
@@ -449,20 +435,21 @@ export default function ItemFormModal({ item, categories, onClose, onSave }: Ite
               <label className="form-label">기본 단위</label>
               <NotionDropdown 
                 value={unit}
-                options={DEFAULT_UNITS}
-                customOptions={customUnits}
+                options={unitsList}
                 onSelect={(val) => setUnit(val)}
                 onAddOption={(newVal) => {
-                  if (!customUnits.includes(newVal)) {
-                    saveCustomUnits([...customUnits, newVal]);
+                  if (!unitsList.includes(newVal)) {
+                    const updated = [...unitsList, newVal];
+                    saveUnitsList(updated);
                   }
                   setUnit(newVal);
                 }}
                 onDeleteOption={(delVal) => {
-                  const filtered = customUnits.filter(u => u !== delVal);
-                  saveCustomUnits(filtered);
+                  const filtered = unitsList.filter(u => u !== delVal);
+                  saveUnitsList(filtered);
                   if (unit === delVal) {
-                    setUnit(DEFAULT_UNITS[0]);
+                    const fallback = filtered.length > 0 ? filtered[0] : '';
+                    setUnit(fallback);
                   }
                 }}
                 placeholder="단위 선택 및 추가"
@@ -478,32 +465,31 @@ export default function ItemFormModal({ item, categories, onClose, onSave }: Ite
               <label className="form-label" style={{ fontWeight: '700', color: 'var(--color-blue)' }}>2단계. 표준 항목명 선택</label>
               <NotionDropdown 
                 value={nameSelect}
-                options={systemNames}
-                customOptions={userNames}
+                options={availableNames}
                 onSelect={(val) => { setNameSelect(val); setIsNameDirty(false); }}
                 onAddOption={(newVal) => {
-                  const currentCatCustoms = customNames[category] || [];
-                  if (!currentCatCustoms.includes(newVal)) {
+                  const currentNames = namesList[category] || [];
+                  if (!currentNames.includes(newVal)) {
                     const updated = {
-                      ...customNames,
-                      [category]: [...currentCatCustoms, newVal]
+                      ...namesList,
+                      [category]: [...currentNames, newVal]
                     };
-                    saveCustomNames(updated);
+                    saveNamesList(updated);
                   }
                   setNameSelect(newVal);
                   setIsNameDirty(false);
                 }}
                 onDeleteOption={(delVal) => {
-                  const currentCatCustoms = customNames[category] || [];
-                  const filtered = currentCatCustoms.filter(n => n !== delVal);
+                  const currentNames = namesList[category] || [];
+                  const filtered = currentNames.filter(n => n !== delVal);
                   const updated = {
-                    ...customNames,
+                    ...namesList,
                     [category]: filtered
                   };
-                  saveCustomNames(updated);
+                  saveNamesList(updated);
                   if (nameSelect === delVal) {
-                    const firstSystemName = systemNames[0] || '';
-                    setNameSelect(firstSystemName);
+                    const fallback = filtered.length > 0 ? filtered[0] : '';
+                    setNameSelect(fallback);
                   }
                 }}
                 placeholder="표준 항목 선택 및 추가"
@@ -688,8 +674,7 @@ export default function ItemFormModal({ item, categories, onClose, onSave }: Ite
 // ==========================================
 interface NotionDropdownProps {
   value: string;
-  options: string[];       // 기본 선택지 (삭제 불가)
-  customOptions: string[]; // 사용자가 임의 추가한 선택지 (삭제 가능)
+  options: string[];       // 통합 단일 옵션 목록
   onSelect: (val: string) => void;
   onAddOption: (val: string) => void;
   onDeleteOption: (val: string) => void;
@@ -699,7 +684,6 @@ interface NotionDropdownProps {
 function NotionDropdown({
   value,
   options,
-  customOptions,
   onSelect,
   onAddOption,
   onDeleteOption,
@@ -756,19 +740,8 @@ function NotionDropdown({
       {isOpen && (
         <div className="notion-dropdown-popover">
           
-          {/* 기본 옵션 목록 (삭제 불가) */}
+          {/* 단일 루프: 모든 항목 끝에 X 삭제 단추가 표시됨 */}
           {options.map((opt) => (
-            <div 
-              key={opt}
-              className={`notion-dropdown-item ${value === opt ? 'active' : ''}`}
-              onClick={() => { onSelect(opt); setIsOpen(false); }}
-            >
-              <span>{opt}</span>
-            </div>
-          ))}
-
-          {/* 사용자가 추가한 옵션 목록 (X 삭제 버튼 노출) */}
-          {customOptions.map((opt) => (
             <div 
               key={opt}
               className={`notion-dropdown-item ${value === opt ? 'active' : ''}`}
@@ -788,6 +761,12 @@ function NotionDropdown({
               </button>
             </div>
           ))}
+
+          {options.length === 0 && (
+            <div style={{ padding: '8px 14px', fontSize: '12px', color: 'var(--text-tertiary)', textAlign: 'center' }}>
+              선택지가 없습니다. 직접 추가하세요.
+            </div>
+          )}
 
           {/* 하단 직접 입력 영역 */}
           <div className="notion-dropdown-input-area" onClick={(e) => e.stopPropagation()}>

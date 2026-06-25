@@ -1606,7 +1606,6 @@ export default function App() {
       {isItemCreateModalOpen && (
         <ItemFormModal 
           item={editingItem}
-          categories={Array.from(new Set(libraryItems.map(i => i.category)))}
           onClose={() => setIsItemCreateModalOpen(false)}
           onSave={handleSaveCostItem}
         />
