@@ -30,7 +30,7 @@ import { StorageAPI, calculateRowAmounts } from './utils/storage';
 // 컴포넌트 임포트
 import ItemFormModal from './components/ItemFormModal';
 import PackageFormModal from './components/PackageFormModal';
-import { LibraryCard, EmptyGroupMessage } from './components/LibraryCard';
+import { LibraryCard, HRGroupCard, EmptyGroupMessage } from './components/LibraryCard';
 import LibraryImportModal from './components/LibraryImportModal';
 import PackageImportModal from './components/PackageImportModal';
 import SettingsTab from './components/SettingsTab';
@@ -624,6 +624,18 @@ export default function App() {
       const updated = libraryItems.filter(i => i.id !== id);
       setLibraryItems(updated);
       await StorageAPI.deleteCostItem(id);
+    }
+  };
+
+  const handleDeleteHRGroup = async (name: string) => {
+    if (confirm(`'${name}' 인력 항목의 5대 레벨 단가 전체를 라이브러리에서 일괄 삭제하시겠습니까? (이미 작성된 견적서에는 영향을 주지 않습니다)`)) {
+      const updated = libraryItems.filter(i => i.name !== name);
+      setLibraryItems(updated);
+      
+      const toDelete = libraryItems.filter(i => i.name === name);
+      for (const item of toDelete) {
+        await StorageAPI.deleteCostItem(item.id);
+      }
     }
   };
 
@@ -1432,9 +1444,65 @@ export default function App() {
                     <span style={{ fontSize: '12px', fontWeight: 'normal', color: 'var(--text-tertiary)' }}>({groupedLibraryItems.hrItems.length}개 항목)</span>
                   </div>
                   <div className="library-grid">
-                    {groupedLibraryItems.hrItems.map(item => (
-                      <LibraryCard key={item.id} item={item} onEdit={(i) => { setEditingItem(i); setIsItemCreateModalOpen(true); }} onDelete={handleDeleteCostItem} />
-                    ))}
+                    {(() => {
+                      const groups: Record<string, CostItem[]> = {};
+                      const singleItems: CostItem[] = [];
+                      
+                      groupedLibraryItems.hrItems.forEach(item => {
+                        if (item.rank && item.rank !== '해당 없음') {
+                          if (!groups[item.name]) {
+                            groups[item.name] = [];
+                          }
+                          groups[item.name].push(item);
+                        } else {
+                          singleItems.push(item);
+                        }
+                      });
+
+                      const RANK_ORDER: Record<string, number> = {
+                        'L1 Support': 1,
+                        'L2 Operator': 2,
+                        'L3 Specialist': 3,
+                        'L4 Lead': 4,
+                        'L5 Director': 5
+                      };
+
+                      // 정렬 처리
+                      Object.keys(groups).forEach(name => {
+                        groups[name].sort((a, b) => {
+                          const rA = a.rank || '';
+                          const rB = b.rank || '';
+                          return (RANK_ORDER[rA] || 0) - (RANK_ORDER[rB] || 0);
+                        });
+                      });
+
+                      return (
+                        <>
+                          {Object.keys(groups).map(name => {
+                            const group = groups[name];
+                            const repItem = group.find(g => g.rank === 'L2 Operator') || group[0];
+                            return (
+                              <HRGroupCard 
+                                key={name}
+                                name={name}
+                                items={group}
+                                repItem={repItem}
+                                onEdit={(i) => { setEditingItem(i); setIsItemCreateModalOpen(true); }}
+                                onDeleteGroup={handleDeleteHRGroup}
+                              />
+                            );
+                          })}
+                          {singleItems.map(item => (
+                            <LibraryCard 
+                              key={item.id} 
+                              item={item} 
+                              onEdit={(i) => { setEditingItem(i); setIsItemCreateModalOpen(true); }} 
+                              onDelete={handleDeleteCostItem} 
+                            />
+                          ))}
+                        </>
+                      );
+                    })()}
                     {groupedLibraryItems.hrItems.length === 0 && <EmptyGroupMessage />}
                   </div>
                 </div>
