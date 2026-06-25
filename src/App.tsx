@@ -17,7 +17,11 @@ import {
   Hammer,
   HelpCircle,
   Building2,
-  Calendar
+  Calendar,
+  LogOut,
+  Send,
+  Check,
+  Shield
 } from 'lucide-react';
 import type { 
   CostItem, 
@@ -42,6 +46,8 @@ import EstimatePreviewModal from './components/EstimatePreviewModal';
 import ClientStatCalendar from './components/ClientStatCalendar';
 import { WbsEditor } from './components/WbsEditor';
 import ClientImportModal from './components/ClientImportModal';
+import AuthContainer from './components/AuthContainer';
+import { supabase, isSupabaseConfigured } from './utils/supabaseClient';
 
 // 등급별 추천 배수 정의 (에디터 내 실시간 연동용)
 const APP_RANK_MULTIPLIERS: Record<string, number> = {
@@ -60,6 +66,58 @@ export default function App() {
   const [projects, setProjects] = useState<EstimateProject[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [activeSubTab, setActiveSubTab] = useState<'estimate' | 'wbs'>('estimate');
+
+  // 사용자 인증 및 권한 상태
+  const [user, setUser] = useState<any>(null);
+  const [userRole, setUserRole] = useState<'member' | 'admin' | null>(null);
+  const [authSkipped, setAuthSkipped] = useState<boolean>(false);
+
+  // Supabase Auth 세션 체크 및 역할(Role) 조회
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+
+    // 1. 현재 세션 가져오기
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        setUser(session.user);
+        fetchUserRole(session.user.id);
+      }
+    });
+
+    // 2. 세션 변경 리스너
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        setUser(session.user);
+        fetchUserRole(session.user.id);
+      } else {
+        setUser(null);
+        setUserRole(null);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  const fetchUserRole = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .select('role')
+        .eq('id', userId)
+        .single();
+      
+      if (!error && data) {
+        setUserRole(data.role as 'member' | 'admin');
+      } else {
+        setUserRole('member');
+      }
+    } catch (err) {
+      console.error('역할 조회 실패:', err);
+      setUserRole('member');
+    }
+  };
   
   useEffect(() => {
     setActiveSubTab('estimate');
@@ -306,6 +364,24 @@ export default function App() {
       return p;
     });
     updateProjectsState(updated);
+  };
+
+  const handleUpdateProjectApproval = (status: 'draft' | 'requested' | 'approved' | 'rejected', reason?: string) => {
+    if (!activeProject) return;
+    const createdBy = user ? user.id : undefined;
+    handleUpdateProjectFields({
+      approvalStatus: status,
+      rejectReason: reason || undefined,
+      createdBy: createdBy || activeProject.createdBy
+    });
+
+    if (status === 'requested') {
+      alert('관리자에게 결재 요청이 전송되었습니다.\n승인이 완료될 때까지 견적서 수정이 불가능합니다.');
+    } else if (status === 'approved') {
+      alert('견적서 결재가 최종 승인 처리되었습니다.');
+    } else if (status === 'rejected') {
+      alert(`견적서 결재가 반려 처리되었습니다.\n반려 사유: ${reason}`);
+    }
   };
 
   const handleSyncWbsToEstimate = () => {
@@ -1542,6 +1618,16 @@ export default function App() {
     );
   }
 
+  // Supabase Auth 렌더링 가드 (설정 완료 상태 && 스킵 안 함 && 미로그인인 경우)
+  if (isSupabaseConfigured && !authSkipped && !user) {
+    return (
+      <AuthContainer 
+        onSkipAuth={() => setAuthSkipped(true)} 
+        onAuthSuccess={(loggedInUser) => setUser(loggedInUser)} 
+      />
+    );
+  }
+
   return (
     <div className="app-container">
       
@@ -1585,6 +1671,32 @@ export default function App() {
         </div>
 
         <div className="sidebar-footer">
+          {user && (
+            <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px', paddingBottom: '12px', borderBottom: '1px solid var(--border-color)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px', backgroundColor: 'var(--bg-secondary)', borderRadius: '6px', fontSize: '11px' }}>
+                <Shield size={14} className="color-blue" style={{ flexShrink: 0 }} />
+                <div style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', flex: 1 }}>
+                  <div style={{ fontWeight: '700', color: 'var(--text-primary)' }}>{user.email}</div>
+                  <div style={{ color: 'var(--text-secondary)', fontSize: '10px', marginTop: '1px', fontWeight: '500' }}>
+                    {userRole === 'admin' ? '관리자 권한' : '팀원 권한'}
+                  </div>
+                </div>
+              </div>
+              <button 
+                type="button" 
+                className="btn btn-secondary btn-sm" 
+                onClick={async () => {
+                  await supabase.auth.signOut();
+                  setUser(null);
+                  setUserRole(null);
+                  setAuthSkipped(false);
+                }}
+                style={{ width: '100%', gap: '6px', justifyContent: 'center', height: '32px', fontSize: '11px', fontWeight: '700' }}
+              >
+                <LogOut size={13} /> 로그아웃
+              </button>
+            </div>
+          )}
           <button type="button" className="btn btn-secondary btn-sm" onClick={handleExportData}>
             <Download size={14} /> 데이터 백업
           </button>
@@ -1613,6 +1725,61 @@ export default function App() {
                     <Plus size={16} /> 새 견적서 작성
                   </button>
                 </div>
+
+                {/* 관리자 결재 심사 대기 섹션 */}
+                {userRole === 'admin' && projects.filter(p => p.approvalStatus === 'requested').length > 0 && (
+                  <div className="card" style={{ marginBottom: '24px', borderLeft: '4px solid #1d4ed8', padding: '20px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px', fontSize: '15px', fontWeight: '700', color: 'var(--text-primary)' }}>
+                      <Shield size={18} style={{ color: '#1d4ed8' }} />
+                      <span>결재 심사 대기 목록 (관리자 전용)</span>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      {projects.filter(p => p.approvalStatus === 'requested').map(proj => (
+                        <div 
+                          key={`pending-${proj.id}`}
+                          style={{ 
+                            display: 'flex', 
+                            justifyContent: 'space-between', 
+                            alignItems: 'center', 
+                            padding: '12px 16px', 
+                            backgroundColor: 'var(--bg-secondary)', 
+                            borderRadius: '8px',
+                            border: '1px solid var(--border-color)'
+                          }}
+                        >
+                          <div>
+                            <div style={{ fontWeight: '700', fontSize: '13.5px', color: 'var(--text-primary)' }}>{proj.title}</div>
+                            <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                              고객사: {proj.clientName} • 발행일: {proj.estimateDate}
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            <button 
+                              type="button" 
+                              className="btn btn-secondary btn-sm"
+                              style={{ height: '32px', fontSize: '11.5px', fontWeight: '700' }}
+                              onClick={() => setSelectedProjectId(proj.id)}
+                            >
+                              상세 심사하기
+                            </button>
+                            <button 
+                              type="button" 
+                              className="btn btn-sm"
+                              style={{ backgroundColor: '#2e7d32', color: '#fff', fontSize: '11.5px', fontWeight: '700', padding: '6px 12px', height: '32px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                              onClick={() => {
+                                const updated = projects.map(p => p.id === proj.id ? { ...p, approvalStatus: 'approved' as const } : p);
+                                updateProjectsState(updated);
+                                alert('승인되었습니다.');
+                              }}
+                            >
+                              <Check size={13} /> 즉시 승인
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {clientStats.length > 0 && (
                   <div className="card" style={{ marginBottom: '24px', padding: '20px', overflowX: 'auto' }}>
@@ -1849,12 +2016,78 @@ export default function App() {
                              activeProject.projectType === 'BUILD' ? '제작/시공 폼' : '기타 폼'}
                           </span>
                           <h1 className="workspace-title">{activeProject.title}</h1>
+                          {/* 결재 상태 뱃지 */}
+                          {(() => {
+                            const status = activeProject.approvalStatus || 'draft';
+                            const statusMap = {
+                              draft: { text: '작성중', color: '#6b7280', bg: '#f3f4f6' },
+                              requested: { text: '결재대기', color: '#1d4ed8', bg: '#dbeafe' },
+                              approved: { text: '승인완료', color: '#15803d', bg: '#dcfce7' },
+                              rejected: { text: '반려됨', color: '#b91c1c', bg: '#fee2e2' }
+                            };
+                            const s = statusMap[status];
+                            return (
+                              <span 
+                                style={{ 
+                                  fontSize: '11px', 
+                                  fontWeight: '700', 
+                                  padding: '2px 8px', 
+                                  borderRadius: '4px', 
+                                  color: s.color, 
+                                  backgroundColor: s.bg,
+                                  border: `1px solid ${s.color}20`,
+                                  marginLeft: '4px'
+                                }}
+                              >
+                                {s.text}
+                              </span>
+                            );
+                          })()}
                         </div>
                         <p className="workspace-subtitle">해당 기본 폼 구조에 맞는 맞춤형 테이블 필드가 제공됩니다.</p>
                       </div>
                     </div>
                     
-                    <div style={{ display: 'flex', gap: '12px' }}>
+                    <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                      {/* 1. 팀원 혹은 게스트 권한일 때 결재 요청 버튼 */}
+                      {userRole !== 'admin' && (activeProject.approvalStatus === 'draft' || activeProject.approvalStatus === 'rejected' || !activeProject.approvalStatus) && (
+                        <button 
+                          type="button" 
+                          className="btn" 
+                          style={{ backgroundColor: '#1976d2', color: '#fff', gap: '6px', fontSize: '13px', padding: '10px 16px', fontWeight: '600', display: 'flex', alignItems: 'center' }}
+                          onClick={() => handleUpdateProjectApproval('requested')}
+                        >
+                          <Send size={14} /> 결재 요청하기
+                        </button>
+                      )}
+
+                      {/* 2. 관리자 권한일 때 승인/반려 버튼 */}
+                      {userRole === 'admin' && activeProject.approvalStatus === 'requested' && (
+                        <>
+                          <button 
+                            type="button" 
+                            className="btn" 
+                            style={{ backgroundColor: '#2e7d32', color: '#fff', gap: '6px', fontSize: '13px', padding: '10px 16px', fontWeight: '600', display: 'flex', alignItems: 'center' }}
+                            onClick={() => handleUpdateProjectApproval('approved')}
+                          >
+                            <Check size={14} /> 결재 승인
+                          </button>
+                          <button 
+                            type="button" 
+                            className="btn" 
+                            style={{ backgroundColor: '#d32f2f', color: '#fff', gap: '6px', fontSize: '13px', padding: '10px 16px', fontWeight: '600', display: 'flex', alignItems: 'center' }}
+                            onClick={() => {
+                              const reason = prompt('반려 사유를 입력하세요:');
+                              if (reason !== null) {
+                                handleUpdateProjectApproval('rejected', reason);
+                              }
+                            }}
+                          >
+                            <X size={14} /> 결재 반려
+                          </button>
+                        </>
+                      )}
+
                       <button type="button" className="btn btn-secondary" onClick={() => setIsPreviewModalOpen(true)}>
                         <Eye size={16} /> 발행 미리보기
                       </button>
@@ -1863,6 +2096,50 @@ export default function App() {
                       </button>
                     </div>
                   </div>
+
+                  {/* 반려 경고 배너 */}
+                  {activeProject.approvalStatus === 'rejected' && activeProject.rejectReason && (
+                    <div style={{ 
+                      backgroundColor: '#fee2e2', 
+                      border: '1px solid #fca5a5', 
+                      borderRadius: '8px', 
+                      padding: '12px 16px', 
+                      marginBottom: '16px',
+                      color: '#b91c1c',
+                      fontSize: '12.5px',
+                      fontWeight: '600',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px'
+                    }}>
+                      <span>⚠️ 결재 반려 안내 :</span>
+                      <span style={{ fontWeight: '500' }}>{activeProject.rejectReason}</span>
+                    </div>
+                  )}
+
+                  {/* 결재 대기/완료에 따른 편집 차단 안내 배너 */}
+                  {(activeProject.approvalStatus === 'requested' || activeProject.approvalStatus === 'approved') && (
+                    <div style={{ 
+                      backgroundColor: activeProject.approvalStatus === 'approved' ? '#dcfce7' : '#dbeafe', 
+                      border: `1px solid ${activeProject.approvalStatus === 'approved' ? '#bbf7d0' : '#bfdbfe'}`, 
+                      borderRadius: '8px', 
+                      padding: '12px 16px', 
+                      marginBottom: '16px',
+                      color: activeProject.approvalStatus === 'approved' ? '#15803d' : '#1e40af',
+                      fontSize: '12.5px',
+                      fontWeight: '600',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px'
+                    }}>
+                      <span>🔒 편집 잠금 안내 :</span>
+                      <span style={{ fontWeight: '500' }}>
+                        {activeProject.approvalStatus === 'approved' 
+                          ? '최종 결재가 승인 완료된 견적서이므로 더 이상 수정할 수 없습니다.' 
+                          : '현재 결재 심사가 진행 중인 대기 상태이므로 더 이상 수정할 수 없습니다.'}
+                      </span>
+                    </div>
+                  )}
 
                   {/* 서브 탭 바 추가 */}
                   <div className="tab-nav" style={{ marginBottom: '20px' }}>
@@ -1884,7 +2161,14 @@ export default function App() {
 
                   {activeSubTab === 'estimate' ? (
 
-                  <div className="editor-layout">
+                  <div 
+                    className="editor-layout"
+                    style={{ 
+                      pointerEvents: (activeProject.approvalStatus === 'requested' || activeProject.approvalStatus === 'approved') ? 'none' : 'auto',
+                      opacity: (activeProject.approvalStatus === 'requested' || activeProject.approvalStatus === 'approved') ? 0.75 : 1,
+                      position: 'relative'
+                    }}
+                  >
                     {/* 에디터 본문 */}
                     <div className="editor-main">
                       
@@ -2535,12 +2819,18 @@ export default function App() {
                     </div>
                   </div>
                 ) : (
-                  <WbsEditor
-                    wbs={activeProject.wbs || []}
-                    availableRoles={['기획/PM', 'UI/UX 디자인', '프론트엔드 개발', '백엔드 개발', 'QA/품질검증', '기타']}
-                    onChange={(updatedWbs) => handleUpdateProjectField('wbs', updatedWbs)}
-                    onSyncToEstimate={handleSyncWbsToEstimate}
-                  />
+                  <div style={{ 
+                    pointerEvents: (activeProject.approvalStatus === 'requested' || activeProject.approvalStatus === 'approved') ? 'none' : 'auto',
+                    opacity: (activeProject.approvalStatus === 'requested' || activeProject.approvalStatus === 'approved') ? 0.75 : 1,
+                    position: 'relative'
+                  }}>
+                    <WbsEditor
+                      wbs={activeProject.wbs || []}
+                      availableRoles={['기획/PM', 'UI/UX 디자인', '프론트엔드 개발', '백엔드 개발', 'QA/품질검증', '기타']}
+                      onChange={(updatedWbs) => handleUpdateProjectField('wbs', updatedWbs)}
+                      onSyncToEstimate={handleSyncWbsToEstimate}
+                    />
+                  </div>
                 )}
               </>
             )

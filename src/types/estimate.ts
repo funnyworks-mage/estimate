@@ -139,6 +139,9 @@ export interface EstimateProject {
   exchangeRateSource?: 'manual' | 'api'; // 환율 입력 소스
   billingDate?: string;         // 청구 예정일 (YYYY-MM-DD)
   paymentDueDate?: string;      // 수금 예정일 (YYYY-MM-DD)
+  createdBy?: string;           // 작성자 UUID
+  approvalStatus?: 'draft' | 'requested' | 'approved' | 'rejected'; // 결재 상태
+  rejectReason?: string;        // 반려 사유
 }
 
 export interface CorrectionFactor {
