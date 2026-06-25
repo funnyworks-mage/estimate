@@ -601,20 +601,95 @@ export default function App() {
   // --- 항목 라이브러리 CRUD (Library Tab) ---
   const handleSaveCostItem = async (item: CostItem | CostItem[]) => {
     let updated: CostItem[] = [...libraryItems];
+    
     if (Array.isArray(item)) {
       // 5대 등급 일괄 저장 처리
       updated = [...item, ...updated];
+      setLibraryItems(updated);
+      await StorageAPI.saveCostItem(item);
     } else {
       // 단일 저장 및 수정 처리
-      const idx = libraryItems.findIndex(i => i.id === item.id);
-      if (idx > -1) {
-        updated[idx] = item;
+      const isHR = item.category.includes('인건비');
+      const hasRank = item.rank && item.rank !== '해당 없음';
+
+      if (isHR && hasRank) {
+        // 1. 수정된 아이템의 레벨 배수를 역산하여 L2 기준 단가(basePrice) 산출
+        const RANK_MULTIPLIERS: Record<string, number> = {
+          'L1 Support': 0.8,
+          'L2 Operator': 1.0,
+          'L3 Specialist': 1.5,
+          'L4 Lead': 2.0,
+          'L5 Director': 3.0
+        };
+        const mult = RANK_MULTIPLIERS[item.rank!] || 1.0;
+        const basePrice = item.rank === 'L2 Operator' ? item.defaultPrice : Math.round(item.defaultPrice / mult);
+
+        // 2. libraryItems 중에서 동일한 이름을 가진 그룹 내의 모든 레벨 항목을 찾음
+        const groupItems = libraryItems.filter(i => i.name === item.name && i.rank && i.rank !== '해당 없음');
+        
+        if (groupItems.length > 0) {
+          const updatedGroup = groupItems.map(gi => {
+            const giMult = RANK_MULTIPLIERS[gi.rank!] || 1.0;
+            const newPrice = Math.round(basePrice * giMult);
+            
+            // 수정한 등급 자체는 사용자가 입력한 필드 값을 철저히 유지하되, 기준 단가만 갱신
+            if (gi.id === item.id) {
+              return {
+                ...item,
+                basePrice
+              };
+            }
+            // 그 외 등급들은 기준단가 변경에 비례하여 단가 일괄 갱신 및 공통 속성 동기화
+            return {
+              ...gi,
+              basePrice,
+              defaultPrice: newPrice,
+              unit: item.unit,
+              category: item.category,
+              vatType: item.vatType,
+              formulaType: item.formulaType
+            };
+          });
+
+          // 전체 라이브러리 리스트에서 해당 그룹에 속한 항목들을 새 데이터로 일괄 교체
+          updated = libraryItems.map(i => {
+            const matched = updatedGroup.find(ug => ug.id === i.id);
+            return matched || i;
+          });
+
+          // 만약 기존 목록에 없던 완전히 새로운 단일 등급 항목이라면 리스트에 새로 삽입
+          const isBrandNew = !groupItems.some(gi => gi.id === item.id);
+          if (isBrandNew) {
+            updated = [{ ...item, basePrice }, ...updated];
+          }
+
+          setLibraryItems(updated);
+          await StorageAPI.saveCostItem(updatedGroup);
+        } else {
+          // 그룹이 존재하지 않는 경우 (예: 최초 1회 생성)
+          const itemWithBase = { ...item, basePrice };
+          const idx = libraryItems.findIndex(i => i.id === item.id);
+          if (idx > -1) {
+            updated[idx] = itemWithBase;
+          } else {
+            updated = [itemWithBase, ...updated];
+          }
+          setLibraryItems(updated);
+          await StorageAPI.saveCostItem(itemWithBase);
+        }
       } else {
-        updated = [item, ...updated];
+        // 일반 결과물형이나 등급이 없는 단품 (현장 스태프 등) 처리
+        const idx = libraryItems.findIndex(i => i.id === item.id);
+        if (idx > -1) {
+          updated[idx] = item;
+        } else {
+          updated = [item, ...updated];
+        }
+        setLibraryItems(updated);
+        await StorageAPI.saveCostItem(item);
       }
     }
-    setLibraryItems(updated);
-    await StorageAPI.saveCostItem(item);
+    
     setIsItemCreateModalOpen(false);
     setEditingItem(null);
   };
