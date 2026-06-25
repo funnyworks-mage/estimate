@@ -38,11 +38,11 @@ import EstimatePreviewModal from './components/EstimatePreviewModal';
 
 // 등급별 추천 배수 정의 (에디터 내 실시간 연동용)
 const APP_RANK_MULTIPLIERS: Record<string, number> = {
-  'Junior': 1.0,
-  'Associate': 1.3,
-  'Professional': 1.7,
-  'Senior': 2.3,
-  'Lead': 3.0
+  'L1 Support': 0.8,
+  'L2 Operator': 1.0,
+  'L3 Specialist': 1.5,
+  'L4 Lead': 2.0,
+  'L5 Director': 3.0
 };
 
 export default function App() {
@@ -318,7 +318,7 @@ export default function App() {
                 if (updatedRow.basePrice) {
                   updatedRow.price = Math.round(updatedRow.basePrice * mult);
                 } else {
-                  const currentRank = row.rank || 'Junior';
+                  const currentRank = row.rank || 'L2 Operator';
                   const currentMult = APP_RANK_MULTIPLIERS[currentRank] || 1.0;
                   const estimatedBase = Math.round(row.price / currentMult);
                   updatedRow.basePrice = estimatedBase;
@@ -1179,11 +1179,11 @@ export default function App() {
                                               title="등급 변경 시 단가가 실시간 배수 연동되어 재산출됩니다"
                                             >
                                               <option value="해당 없음">해당 없음</option>
-                                              <option value="Junior">Junior</option>
-                                              <option value="Associate">Associate</option>
-                                              <option value="Professional">Professional</option>
-                                              <option value="Senior">Senior</option>
-                                              <option value="Lead">Lead</option>
+                                              <option value="L1 Support">L1 Support</option>
+                                              <option value="L2 Operator">L2 Operator</option>
+                                              <option value="L3 Specialist">L3 Specialist</option>
+                                              <option value="L4 Lead">L4 Lead</option>
+                                              <option value="L5 Director">L5 Director</option>
                                             </select>
                                           )}
                                         </div>

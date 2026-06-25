@@ -7,10 +7,12 @@ const DEFAULT_COST_ITEMS: CostItem[] = [
   {
     id: 'item-pm',
     name: 'PM 기획 인력',
-    internalName: 'PM 기획 인력 (Lead)',
+    internalName: 'PM 기획 인력 (L5 Director)',
     category: '인건비 기준 (용역 공수)',
     unit: 'MD',
-    defaultPrice: 500000,
+    defaultPrice: 1500000,
+    rank: 'L5 Director',
+    basePrice: 500000,
     formulaType: 'PEOPLE_x_DAYS_x_PRICE', // 인력형 전환: 인원 * 기간 = MD 공수 자동 환산
     vatType: 'TAX',
     description: '기획 및 PM 총괄 업무',
@@ -19,10 +21,12 @@ const DEFAULT_COST_ITEMS: CostItem[] = [
   {
     id: 'item-designer',
     name: '디자이너 투입',
-    internalName: '디자이너 (Senior)',
+    internalName: '디자이너 (L4 Lead)',
     category: '디자인 결과물 기준',
     unit: 'MD',
-    defaultPrice: 400000,
+    defaultPrice: 800000,
+    rank: 'L4 Lead',
+    basePrice: 400000,
     formulaType: 'PEOPLE_x_DAYS_x_PRICE', // 인력형 전환: 인원 * 기간 = MD 공수 자동 환산
     vatType: 'TAX',
     description: 'UI/UX 및 키비주얼 디자인',
@@ -31,10 +35,12 @@ const DEFAULT_COST_ITEMS: CostItem[] = [
   {
     id: 'item-fe',
     name: '프론트엔드 개발',
-    internalName: '프론트엔드 개발 (Professional)',
+    internalName: '프론트엔드 개발 (L3 Specialist)',
     category: '인건비 기준 (용역 공수)',
     unit: 'MD',
     defaultPrice: 600000,
+    rank: 'L3 Specialist',
+    basePrice: 400000,
     formulaType: 'PEOPLE_x_DAYS_x_PRICE', // 인력형 전환: 인원 * 기간 = MD 공수 자동 환산
     vatType: 'TAX',
     description: '화면 웹/앱 UI 구현 및 API 연동',
@@ -43,10 +49,12 @@ const DEFAULT_COST_ITEMS: CostItem[] = [
   {
     id: 'item-be',
     name: '백엔드 개발',
-    internalName: '백엔드 개발 (Senior)',
+    internalName: '백엔드 개발 (L4 Lead)',
     category: '인건비 기준 (용역 공수)',
     unit: 'MD',
-    defaultPrice: 700000,
+    defaultPrice: 1000000,
+    rank: 'L4 Lead',
+    basePrice: 500000,
     formulaType: 'PEOPLE_x_DAYS_x_PRICE', // 인력형 전환: 인원 * 기간 = MD 공수 자동 환산
     vatType: 'TAX',
     description: '데이터베이스 설계 및 서버 API 개발',
@@ -55,10 +63,12 @@ const DEFAULT_COST_ITEMS: CostItem[] = [
   {
     id: 'item-staff',
     name: '현장 운영 인력',
-    internalName: '현장 진행 스태프 (Associate)',
+    internalName: '현장 진행 스태프 (L2 Operator)',
     category: '인건비 기준 (용역 공수)',
     unit: '일',
     defaultPrice: 100000,
+    rank: 'L2 Operator',
+    basePrice: 100000,
     formulaType: 'PEOPLE_x_DAYS_x_PRICE',
     vatType: 'TAX',
     description: '행사 현장 안내 및 운영 지원 인력',

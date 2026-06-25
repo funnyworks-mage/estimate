@@ -16,10 +16,10 @@ interface ItemFormModalProps {
 
 // 역할 및 책임 레벨별 추천 배수 정의
 const RANK_MULTIPLIERS: Record<string, number> = {
-  'L1 Support': 1.0,
-  'L2 Operator': 1.3,
-  'L3 Specialist': 1.7,
-  'L4 Lead': 2.3,
+  'L1 Support': 0.8,
+  'L2 Operator': 1.0,
+  'L3 Specialist': 1.5,
+  'L4 Lead': 2.0,
   'L5 Director': 3.0
 };
 
@@ -197,7 +197,7 @@ export default function ItemFormModal({
         defaultPrice,
         rank: isHR && rank !== '해당 없음' ? rank : undefined,
         basePrice: isHR && rank !== '해당 없음'
-          ? (item?.basePrice || (rank === 'L1 Support' ? defaultPrice : Math.round(defaultPrice / (RANK_MULTIPLIERS[rank] || 1.0))))
+          ? (item?.basePrice || (rank === 'L2 Operator' ? defaultPrice : Math.round(defaultPrice / (RANK_MULTIPLIERS[rank] || 1.0))))
           : undefined,
         formulaType,
         vatType,
@@ -575,7 +575,7 @@ export default function ItemFormModal({
           <div className="grid-2" style={{ borderTop: '1px dashed var(--border-color)', paddingTop: '16px' }}>
             <div className="form-group">
               <label className="form-label">
-                {isHR && isBulkRank ? 'L1 Support 기준 단가 (1.0x, 원)' : '기준 단가 (원)'}
+                {isHR && isBulkRank ? 'L2 Operator 기준 단가 (1.0x, 원)' : '기준 단가 (원)'}
               </label>
               <input 
                 type="number" 
