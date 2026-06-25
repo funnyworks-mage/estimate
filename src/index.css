@@ -68,29 +68,83 @@ button, input, select, textarea {
   flex-direction: column;
   height: 100%;
   flex-shrink: 0;
+  position: relative; /* 플로팅 버튼의 기준점 */
+  transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1); /* 부드러운 가속도 곡선 */
+}
+
+/* 사이드바 접힘 규격 */
+.sidebar.collapsed {
+  width: 68px;
 }
 
 .sidebar-logo {
-  padding: 24px;
+  padding: 20px 16px;
   display: flex;
   align-items: center;
-  gap: 10px;
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--color-blue);
+  height: 64px;
   border-bottom: 1px solid var(--border-color);
+  box-sizing: border-box;
+  transition: padding 0.25s ease;
 }
 
-.sidebar-logo span {
-  color: var(--text-primary);
-  font-weight: 600;
-  font-size: 18px;
+.sidebar.collapsed .sidebar-logo {
+  padding: 20px 12px;
+}
+
+/* 사이드바 우측 경계선에 반쯤 걸치는 프리미엄 플로팅 토글 버튼 */
+.sidebar-toggle-btn {
+  position: absolute;
+  right: -10px;
+  top: 20px;
+  width: 20px;
+  height: 20px;
+  background-color: #ffffff;
+  border: 1px solid var(--border-color);
+  border-radius: 50%;
+  cursor: pointer;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 100;
+  padding: 0;
+}
+
+.sidebar-toggle-btn:hover {
+  background-color: var(--color-blue);
+  color: #ffffff;
+  border-color: var(--color-blue);
+  transform: scale(1.1);
 }
 
 .sidebar-menu {
   padding: 16px 12px;
   flex: 1;
   overflow-y: auto;
+  transition: padding 0.25s ease;
+}
+
+.sidebar.collapsed .sidebar-menu {
+  padding: 16px 8px;
+}
+
+/* 사이드바 텍스트 애니메이션용 범용 클래스 */
+.sidebar-text {
+  transition: opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1), max-width 0.2s cubic-bezier(0.4, 0, 0.2, 1), margin 0.2s ease;
+  opacity: 1;
+  max-width: 150px;
+  display: inline-block;
+  overflow: hidden;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.sidebar.collapsed .sidebar-text {
+  opacity: 0;
+  max-width: 0;
+  margin-left: 0 !important;
 }
 
 .menu-section-title {
@@ -101,6 +155,18 @@ button, input, select, textarea {
   margin-bottom: 8px;
   text-transform: uppercase;
   letter-spacing: 0.8px;
+  white-space: nowrap;
+  overflow: hidden;
+  transition: opacity 0.15s ease, max-height 0.2s ease, margin-bottom 0.2s ease, padding 0.2s ease;
+  max-height: 20px;
+  opacity: 1;
+}
+
+.sidebar.collapsed .menu-section-title {
+  opacity: 0;
+  max-height: 0;
+  margin-bottom: 0;
+  padding: 0;
 }
 
 .menu-item {
@@ -113,9 +179,11 @@ button, input, select, textarea {
   color: var(--text-secondary);
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.15s ease, padding 0.25s cubic-bezier(0.4, 0, 0.2, 1), gap 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   margin-bottom: 4px;
   text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
 }
 
 .menu-item:hover {
@@ -129,12 +197,45 @@ button, input, select, textarea {
   font-weight: 600;
 }
 
+.sidebar.collapsed .menu-item {
+  justify-content: center;
+  padding: 10px;
+  gap: 0;
+}
+
 .sidebar-footer {
   padding: 16px;
   border-top: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
   gap: 8px;
+  transition: padding 0.25s ease, align-items 0.25s ease;
+}
+
+.sidebar.collapsed .sidebar-footer {
+  padding: 16px 8px;
+  align-items: center;
+}
+
+/* 하단 백업/복원 버튼의 CSS 기반 접힘 애니메이션 */
+.sidebar-footer-btn {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  justify-content: flex-start;
+  gap: 8px;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.sidebar.collapsed .sidebar-footer-btn {
+  padding: 8px !important;
+  width: 36px !important;
+  height: 36px !important;
+  justify-content: center !important;
+  gap: 0 !important;
+  border-radius: 50% !important;
 }
 
 /* --- Main Content Area --- */
@@ -169,6 +270,51 @@ button, input, select, textarea {
   font-size: 24px;
   font-weight: 700;
   color: var(--text-primary);
+}
+
+.workspace-title-container {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  padding: 2px 6px;
+  margin-left: -6px;
+  transition: background-color 0.15s ease;
+}
+
+.workspace-title-container:hover {
+  background-color: var(--bg-secondary);
+}
+
+.workspace-title-edit-icon {
+  color: var(--text-tertiary);
+  opacity: 0;
+  transition: opacity 0.15s ease, color 0.15s ease;
+}
+
+.workspace-title-container:hover .workspace-title-edit-icon {
+  opacity: 1;
+}
+
+.workspace-title-container:hover .workspace-title-edit-icon:hover {
+  color: var(--color-blue);
+}
+
+.workspace-title-input {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-primary);
+  background-color: #ffffff;
+  border: 1px solid var(--color-blue);
+  border-radius: var(--radius-md);
+  padding: 2px 8px;
+  margin-left: -8px;
+  outline: none;
+  font-family: inherit;
+  width: 450px;
+  box-shadow: 0 0 0 3px var(--color-blue-light);
+  box-sizing: border-box;
 }
 
 .workspace-subtitle {
@@ -469,15 +615,29 @@ button, input, select, textarea {
   border-bottom: none;
 }
 
+/* Disable number input spin buttons for price and no-spin inputs only */
+.no-spin::-webkit-outer-spin-button,
+.no-spin::-webkit-inner-spin-button,
+.table-input.price::-webkit-outer-spin-button,
+.table-input.price::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type=number].no-spin,
+input[type=number].price {
+  -moz-appearance: textfield;
+}
+
 /* Table Input Styles */
 .table-input {
   width: 100%;
   border: 1px solid var(--border-color);
   background-color: #fafafa;
-  padding: 6px 8px;
+  padding: 6px 6px;
   border-radius: var(--radius-sm);
   outline: none;
   transition: all 0.15s ease;
+  box-sizing: border-box;
 }
 
 .table-input:hover {
@@ -493,11 +653,21 @@ button, input, select, textarea {
 
 .table-input.num {
   text-align: right;
+  padding-left: 4px;
+  padding-right: 4px;
 }
 
 .table-input.price {
   text-align: right;
   font-weight: 500;
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+.table-input.text-center {
+  text-align: center;
+  padding-left: 4px;
+  padding-right: 4px;
 }
 
 .text-right {
@@ -809,7 +979,8 @@ button, input, select, textarea {
   padding: 40px;
   overflow-y: auto;
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
   flex: 1;
 }
 
@@ -818,7 +989,7 @@ button, input, select, textarea {
   background-color: #ffffff;
   width: 210mm;
   min-height: 297mm;
-  padding: 20mm 20mm;
+  padding: 20mm 12mm;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
   font-family: 'KoPub Batang', 'Noto Sans KR', serif; /* 격식있는 서체 조합 */
   color: #000000;
@@ -868,16 +1039,26 @@ button, input, select, textarea {
   width: 100%;
   border-collapse: collapse;
   border: 1px solid #000;
+  table-layout: fixed; /* 고정 너비 레이아웃 적용 */
 }
 
 .vendor-info-table th {
   background-color: #f4f4f4;
   font-weight: 600;
-  width: 25%;
   border: 1px solid #000;
   font-size: 11px;
   text-align: center;
   padding: 6px 4px;
+}
+
+/* 첫 번째 공급자 세로 셀 폭 지정 */
+.vendor-info-table th[rowspan="5"] {
+  width: 30px !important;
+}
+
+/* 다른 th 열들의 너비 지정 */
+.vendor-info-table th:not([rowspan="5"]) {
+  width: 80px !important;
 }
 
 .vendor-info-table td {
@@ -885,6 +1066,10 @@ button, input, select, textarea {
   font-size: 11px;
   padding: 6px 8px;
   position: relative;
+  word-break: break-all;
+  white-space: nowrap; /* 텍스트가 좁아도 임의 줄바꿈 금지 */
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .seal-wrapper {
@@ -988,9 +1173,15 @@ button, input, select, textarea {
 
 /* --- Print Media Query (CRITICAL for PDF Save) --- */
 @media print {
+  @page {
+    margin: 0;
+  }
+
   body {
     background-color: #ffffff !important;
     color: #000000 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
   .app-container {
@@ -1004,16 +1195,13 @@ button, input, select, textarea {
   }
 
   .main-content {
-    display: block;
-    height: auto;
-    overflow: visible;
+    display: none !important;
   }
 
   .workspace {
     padding: 0 !important;
     margin: 0 !important;
     overflow: visible !important;
-    height: auto !important;
   }
 
   .preview-document-container {
@@ -1040,9 +1228,26 @@ button, input, select, textarea {
 
   .a4-page {
     box-shadow: none !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    width: 100% !important;
-    min-height: auto !important;
+    padding: 15mm 12mm !important; /* 브라우저 마진 0이므로 실제 용지 여백을 패딩으로 배정 */
+    margin: 0 auto !important;
+    width: 210mm !important; /* A4 가로 규격 */
+    min-height: 297mm !important; /* A4 세로 규격 */
+    page-break-after: always !important;
+    break-after: page !important;
+    box-sizing: border-box !important;
   }
+
+  /* WBS 별첨 페이지 강제 개페이지 처리 */
+  .a4-page.wbs-attachment-page {
+    page-break-before: always !important;
+    break-before: page !important;
+    margin-top: 0 !important;
+    border-top: none !important;
+  }
+}
+
+/* WBS 별첨 페이지 일반 뷰포트 스타일 */
+.preview-document-container .a4-page.wbs-attachment-page {
+  margin-top: 35px !important;
+  border-top: 2px dashed var(--border-color) !important;
 }

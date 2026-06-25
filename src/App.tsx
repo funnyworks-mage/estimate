@@ -15,7 +15,8 @@ import {
   Terminal,
   Palette,
   Hammer,
-  HelpCircle
+  HelpCircle,
+  Building2
 } from 'lucide-react';
 import type { 
   CostItem, 
@@ -23,8 +24,10 @@ import type {
   EstimateProject, 
   EstimateRow, 
   EstimateSection, 
-  VendorInfo
+  VendorInfo,
+  ClientInfo
 } from './types/estimate';
+import { TOTAL_CORRECTION_PRESETS } from './types/estimate';
 import { StorageAPI, calculateRowAmounts } from './utils/storage';
 
 // 컴포넌트 임포트
@@ -35,6 +38,8 @@ import LibraryImportModal from './components/LibraryImportModal';
 import PackageImportModal from './components/PackageImportModal';
 import SettingsTab from './components/SettingsTab';
 import EstimatePreviewModal from './components/EstimatePreviewModal';
+import { WbsEditor } from './components/WbsEditor';
+import ClientImportModal from './components/ClientImportModal';
 
 // 등급별 추천 배수 정의 (에디터 내 실시간 연동용)
 const APP_RANK_MULTIPLIERS: Record<string, number> = {
@@ -52,8 +57,14 @@ export default function App() {
   // 데이터 상태
   const [projects, setProjects] = useState<EstimateProject[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [activeSubTab, setActiveSubTab] = useState<'estimate' | 'wbs'>('estimate');
+  
+  useEffect(() => {
+    setActiveSubTab('estimate');
+  }, [selectedProjectId]);
   const [libraryItems, setLibraryItems] = useState<CostItem[]>([]);
   const [libraryPackages, setLibraryPackages] = useState<CostPackage[]>([]);
+  const [clients, setClients] = useState<ClientInfo[]>([]);
   const [vendorInfo, setVendorInfo] = useState<VendorInfo>({
     companyName: '',
     bizNumber: '',
@@ -71,14 +82,18 @@ export default function App() {
   const [isLibraryModalOpen, setIsLibraryModalOpen] = useState(false);
   const [isPackageModalOpen, setIsPackageModalOpen] = useState(false);
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
+  const [isClientImportModalOpen, setIsClientImportModalOpen] = useState(false);
+  const [customAmountInput, setCustomAmountInput] = useState<string>('');
   const [targetSectionId, setTargetSectionId] = useState<string | null>(null);
   
   // 라이브러리 탭 관리용 상태
-  const [librarySubTab, setLibrarySubTab] = useState<'items' | 'packages'>('items');
+  const [librarySubTab, setLibrarySubTab] = useState<'items' | 'packages' | 'clients'>('items');
   const [isItemCreateModalOpen, setIsItemCreateModalOpen] = useState(false);
   const [isPackageCreateModalOpen, setIsPackageCreateModalOpen] = useState(false);
+  const [isClientCreateModalOpen, setIsClientCreateModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<CostItem | null>(null);
   const [editingPackage, setEditingPackage] = useState<CostPackage | null>(null);
+  const [editingClient, setEditingClient] = useState<ClientInfo | null>(null);
 
   const [isLoading, setIsLoading] = useState(true);
 
@@ -90,12 +105,55 @@ export default function App() {
         const projs = await StorageAPI.getProjects();
         const items = await StorageAPI.getCostItems();
         const pkgs = await StorageAPI.getCostPackages();
+        const cls = await StorageAPI.getClients();
         const vendor = await StorageAPI.getVendorInfo();
         const settings = await StorageAPI.getSettings();
         
-        setProjects(projs);
+        // 기존 프로젝트들의 공급자 정보 및 상태값 마이그레이션 정화
+        let hasMigrated = false;
+        const migratedProjs = projs.map(proj => {
+          let updatedProj = { ...proj };
+          let changed = false;
+
+          // 1. 공급자 정보 강제 정화
+          if (proj.vendorInfo && (proj.vendorInfo.ownerName === '홍길동' || proj.vendorInfo.address?.includes('5층') || proj.vendorInfo.ownerName !== vendor.ownerName || proj.vendorInfo.address !== vendor.address)) {
+            updatedProj.vendorInfo = vendor;
+            changed = true;
+          }
+
+          // 2. 레거시 상태값 ('published')을 신규 3단계 상태값 ('invoicing')으로 마이그레이션
+          if ((proj.status as string) === 'published') {
+            updatedProj.status = 'invoicing';
+            changed = true;
+          }
+
+          // 3. 섹션 이름 앞의 숫자 접두사 ("1. ", "2. " 등) 제거 마이그레이션
+          const hasNumberedSection = proj.sections.some(sec => /^\d+\.\s*/.test(sec.name));
+          if (hasNumberedSection) {
+            updatedProj.sections = proj.sections.map(sec => ({
+              ...sec,
+              name: sec.name.replace(/^\d+\.\s*/, '')
+            }));
+            changed = true;
+          }
+
+          if (changed) {
+            hasMigrated = true;
+            return updatedProj;
+          }
+          return proj;
+        });
+
+        if (hasMigrated) {
+          setProjects(migratedProjs);
+          await StorageAPI.saveProjects(migratedProjs);
+        } else {
+          setProjects(projs);
+        }
+        
         setLibraryItems(items);
         setLibraryPackages(pkgs);
+        setClients(cls);
         setVendorInfo(vendor);
         setCategoriesList(settings.categories);
         setUnitsList(settings.units);
@@ -113,6 +171,7 @@ export default function App() {
   const activeProject = useMemo(() => {
     return projects.find(p => p.id === selectedProjectId) || null;
   }, [projects, selectedProjectId]);
+
 
   // --- 데이터 변경 시 저장 핸들러 ---
   const updateProjectsState = async (newProjects: EstimateProject[]) => {
@@ -133,12 +192,12 @@ export default function App() {
       initialSections = [
         {
           id: `sec-it-1`,
-          name: '1. 기획 및 디자인 부문 (디자인/컨설팅)',
+          name: '기획 및 디자인 부문 (디자인/컨설팅)',
           rows: []
         },
         {
           id: `sec-it-2`,
-          name: '2. 시스템 구축 및 소프트웨어 개발 부문',
+          name: '시스템 구축 및 소프트웨어 개발 부문',
           rows: []
         }
       ];
@@ -147,12 +206,12 @@ export default function App() {
       initialSections = [
         {
           id: `sec-design-1`,
-          name: '1. 브랜드 시각 아이덴티티(BI/BX) 디자인 부문',
+          name: '브랜드 시각 아이덴티티(BI/BX) 디자인 부문',
           rows: []
         },
         {
           id: `sec-design-2`,
-          name: '2. 제작 어플리케이션 및 최종 산출물 부문',
+          name: '제작 어플리케이션 및 최종 산출물 부문',
           rows: []
         }
       ];
@@ -161,12 +220,12 @@ export default function App() {
       initialSections = [
         {
           id: `sec-build-1`,
-          name: '1. 자재 및 원부자재 하드웨어 공급 부문',
+          name: '자재 및 원부자재 하드웨어 공급 부문',
           rows: []
         },
         {
           id: `sec-build-2`,
-          name: '2. 현장 제작 및 설치 시공 인건비 부문',
+          name: '현장 제작 및 설치 시공 인건비 부문',
           rows: []
         }
       ];
@@ -175,7 +234,7 @@ export default function App() {
       initialSections = [
         {
           id: `sec-other-1`,
-          name: '1. 일반 공급 및 서비스 부문',
+          name: '일반 공급 및 서비스 부문',
           rows: []
         }
       ];
@@ -236,12 +295,201 @@ export default function App() {
     updateProjectsState(updated);
   };
 
+  const handleUpdateProjectFields = (fields: Partial<EstimateProject>) => {
+    if (!activeProject) return;
+    const updated = projects.map(p => {
+      if (p.id === activeProject.id) {
+        return { ...p, ...fields };
+      }
+      return p;
+    });
+    updateProjectsState(updated);
+  };
+
+  const handleSyncWbsToEstimate = () => {
+    if (!activeProject || !activeProject.wbs || activeProject.wbs.length === 0) {
+      alert('동기화할 WBS 데이터가 존재하지 않습니다.');
+      return;
+    }
+
+    const getWbsRoleKey = (roleName: string): string => {
+      const name = roleName.replace(/\s+/g, '').toLowerCase();
+      if (name.includes('pm') || name.includes('기획')) return '기획';
+      if (name.includes('디자인') || name.includes('디자이너') || name.includes('ui/ux') || name.includes('ux') || name.includes('ui')) return '디자인';
+      if (name.includes('프론트') || name.includes('fe') || name.includes('front')) return '프론트엔드';
+      if (name.includes('백엔드') || name.includes('be') || name.includes('back')) return '백엔드';
+      if (name.includes('qa') || name.includes('테스트') || name.includes('검증') || name.includes('품질')) return 'qa';
+      return '기타';
+    };
+
+    const getRowRoleKey = (rowName: string): string => {
+      const name = rowName.replace(/\s+/g, '').toLowerCase();
+      if (name.includes('pm') || name.includes('기획')) return '기획';
+      if (name.includes('디자인') || name.includes('디자이너') || name.includes('ui/ux') || name.includes('ux') || name.includes('ui')) return '디자인';
+      if (name.includes('프론트') || name.includes('fe') || name.includes('front')) return '프론트엔드';
+      if (name.includes('백엔드') || name.includes('be') || name.includes('back')) return '백엔드';
+      if (name.includes('qa') || name.includes('테스트') || name.includes('검증') || name.includes('품질')) return 'qa';
+      return '기타';
+    };
+
+    const roleTotals: Record<string, number> = {
+      기획: 0,
+      디자인: 0,
+      프론트엔드: 0,
+      백엔드: 0,
+      qa: 0
+    };
+
+    activeProject.wbs.forEach(cat => {
+      cat.tasks.forEach(task => {
+        const roles = task.roles && task.roles.length > 0 ? task.roles : [task.role];
+        roles.forEach(r => {
+          if (r === '해당없음') return;
+          const key = getWbsRoleKey(r);
+          if (roleTotals[key] !== undefined) {
+            const taskTotal = (task.manpower * task.md) / roles.length;
+            roleTotals[key] += taskTotal;
+          }
+        });
+      });
+    });
+
+    let syncCount = 0;
+
+    const updatedSections = activeProject.sections.map(section => {
+      const updatedRows = section.rows.map(row => {
+        const isHR = row.formulaType === 'PEOPLE_x_DAYS_x_PRICE' || (row.category && row.category.includes('인건비'));
+        if (isHR) {
+          const rowRoleKey = getRowRoleKey(row.name);
+          const wbsTotalMd = roleTotals[rowRoleKey];
+          if (wbsTotalMd !== undefined && wbsTotalMd > 0) {
+            syncCount++;
+            const people = row.people || 1;
+            const days = Math.round((wbsTotalMd / people) * 10) / 10;
+            const quantity = Math.round((people * days) * 10) / 10;
+            
+            const calculated = calculateRowAmounts({
+              ...row,
+              people,
+              days,
+              quantity
+            });
+
+            return {
+              ...row,
+              ...calculated
+            };
+          }
+        }
+        return row;
+      });
+      return { ...section, rows: updatedRows };
+    });
+
+    if (syncCount === 0) {
+      alert('WBS 공수와 매칭되는 견적서 인건비 항목을 찾을 수 없습니다.\n견적서의 항목명(예: 기획, 디자인, 프론트엔드, 백엔드, QA)과 WBS의 역할군이 올바르게 매치되는지 확인해주세요.');
+      return;
+    }
+
+    handleUpdateProjectField('sections', updatedSections);
+    alert(`WBS 공수가 견적서 인건비 총 ${syncCount}개 항목에 성공적으로 동기화되었습니다.`);
+  };
+
+  // --- 외화 환율 자동 조회 기능 ---
+  const handleFetchAutoExchangeRate = async () => {
+    if (!activeProject) return;
+    const dateStr = activeProject.estimateDate || new Date().toISOString().split('T')[0];
+    try {
+      const res = await fetch(`https://api.frankfurter.app/${dateStr}?from=EUR&to=KRW`);
+      if (!res.ok) throw new Error('환율 정보 획득 실패');
+      const data = await res.json();
+      const rate = data.rates?.KRW;
+      if (rate) {
+        const updated = projects.map(p => {
+          if (p.id === activeProject.id) {
+            return { ...p, exchangeRate: rate, exchangeRateSource: 'api' as const };
+          }
+          return p;
+        });
+        updateProjectsState(updated);
+        alert(`발행일(${dateStr}) 기준 표준 고시환율(1 EUR = ${rate.toLocaleString()}원)이 자동 반영되었습니다.`);
+      }
+    } catch (error) {
+      alert('환율 자동 조회 실패. 수동 기입바랍니다.');
+    }
+  };
+
+  // 외화 표기 활성화 혹은 발행일 변경 시 최초 환율 자동 조회
+  useEffect(() => {
+    if (activeProject && activeProject.useForeignCurrency && !activeProject.exchangeRate) {
+      const fetchInitialRate = async () => {
+        const dateStr = activeProject.estimateDate || new Date().toISOString().split('T')[0];
+        try {
+          const res = await fetch(`https://api.frankfurter.app/${dateStr}?from=EUR&to=KRW`);
+          if (res.ok) {
+            const data = await res.json();
+            const rate = data.rates?.KRW;
+            if (rate) {
+              const updated = projects.map(p => {
+                if (p.id === activeProject.id) {
+                  return { ...p, exchangeRate: rate, exchangeRateSource: 'api' as const };
+                }
+                return p;
+              });
+              updateProjectsState(updated);
+            }
+          }
+        } catch (e) {
+          console.warn('최초 환율 자동 조회 실패:', e);
+        }
+      };
+      fetchInitialRate();
+    }
+  }, [activeProject?.useForeignCurrency, activeProject?.estimateDate]);
+
+  // 수동 입력한 청구 합계 금액을 프로젝트 상태에 정식 반영
+  const handleApplyCustomAmount = () => {
+    if (!activeProject) return;
+    
+    const rawVal = customAmountInput;
+    const numVal = Number(rawVal);
+    
+    if (!rawVal || isNaN(numVal) || numVal <= 0) {
+      handleUpdateProjectFields({
+        totalCorrectionRate: 0,
+        totalCorrectionName: ''
+      });
+      alert('금액이 초기화되었습니다.');
+      return;
+    }
+
+    const supplyTotal = projectSummary.supplyTotal;
+    let customGrandTotalInKRW = numVal;
+
+    // 외화 표기가 활성화되어 있다면 원화로 우선 환산
+    if (activeProject.useForeignCurrency && activeProject.exchangeRate) {
+      customGrandTotalInKRW = Math.round(numVal * activeProject.exchangeRate);
+    }
+
+    const finalSupply = Math.round(customGrandTotalInKRW / 1.1);
+    const totalCorrectionAmount = finalSupply - supplyTotal;
+    const rate = supplyTotal > 0 ? totalCorrectionAmount / supplyTotal : 0;
+
+    handleUpdateProjectFields({
+      totalCorrectionRate: rate,
+      totalCorrectionName: '수동 금액 조정'
+    });
+
+    const currencyUnit = activeProject.useForeignCurrency ? activeProject.foreignCurrency || 'EUR' : 'KRW';
+    alert(`수동 청구 합계 금액(${numVal.toLocaleString()} ${currencyUnit})이 적용되었습니다.`);
+  };
+
   // --- 섹션 관리 ---
   const handleAddSection = () => {
     if (!activeProject) return;
     const newSection: EstimateSection = {
       id: `sec-${Date.now()}`,
-      name: `${activeProject.sections.length + 1}. 새로운 섹션 부문`,
+      name: '새로운 섹션 부문',
       rows: []
     };
     const updatedSections = [...activeProject.sections, newSection];
@@ -308,6 +556,26 @@ export default function App() {
         const updatedRows = sec.rows.map(row => {
           if (row.id === rowId) {
             let updatedRow = { ...row, [field]: value };
+            
+            // PEOPLE_x_DAYS_x_PRICE 포뮬러일 때 공수/인원/기간 상호 연동 계산 (자동 스플릿)
+            if (row.formulaType === 'PEOPLE_x_DAYS_x_PRICE') {
+              if (field === 'quantity') {
+                // 수량(공수)이 변경된 경우: 기간(days)을 역산하여 자동 분할 (days = quantity / people)
+                const qVal = Number(value) || 0;
+                const people = row.people || 1;
+                updatedRow.days = Math.round((qVal / people) * 10) / 10;
+              } else if (field === 'people') {
+                // 인원(people)이 변경된 경우: 수량/공수 = 인원 * 기간
+                const pVal = Number(value) || 0;
+                const days = row.days || 0;
+                updatedRow.quantity = Math.round((pVal * days) * 10) / 10;
+              } else if (field === 'days') {
+                // 기간(days)이 변경된 경우: 수량/공수 = 인원 * 기간
+                const dVal = Number(value) || 0;
+                const people = row.people || 0;
+                updatedRow.quantity = Math.round((people * dVal) * 10) / 10;
+              }
+            }
             
             // 등급(rank) 변경 시 실시간 단가 연동 계산 엔진 (하위 호환 역산 내장)
             if (field === 'rank') {
@@ -527,7 +795,19 @@ export default function App() {
 
   // --- 금액 요약 연산 ---
   const projectSummary = useMemo(() => {
-    if (!activeProject) return { supplyTotal: 0, vatTotal: 0, grandTotal: 0 };
+    if (!activeProject) {
+      return { 
+        supplyTotal: 0, 
+        vatTotal: 0, 
+        grandTotal: 0,
+        totalCorrectionRate: 0,
+        totalCorrectionName: '',
+        totalCorrectionAmount: 0,
+        finalSupplyTotal: 0,
+        finalVatTotal: 0,
+        finalGrandTotal: 0
+      };
+    }
     
     let supplyTotal = 0;
     let vatTotal = 0;
@@ -541,12 +821,271 @@ export default function App() {
       });
     });
 
+    const totalCorrectionRate = activeProject.totalCorrectionRate || 0;
+    const totalCorrectionName = activeProject.totalCorrectionName || '';
+    
+    // 총괄 보정 금액 계산 (원화 공급가액 소계 기준 반올림)
+    const totalCorrectionAmount = Math.round(supplyTotal * totalCorrectionRate);
+    
+    const finalSupplyTotal = supplyTotal + totalCorrectionAmount;
+    
+    // 최종 부가세 소계 계산 (최종 공급가액의 10% 세액 적용, 소수점 버림)
+    const finalVatTotal = totalCorrectionRate !== 0 
+      ? Math.floor(finalSupplyTotal * 0.1)
+      : vatTotal;
+      
+    const finalGrandTotal = finalSupplyTotal + finalVatTotal;
+
     return {
       supplyTotal,
       vatTotal,
-      grandTotal: supplyTotal + vatTotal
+      grandTotal: supplyTotal + vatTotal,
+      totalCorrectionRate,
+      totalCorrectionName,
+      totalCorrectionAmount,
+      finalSupplyTotal,
+      finalVatTotal,
+      finalGrandTotal
     };
   }, [activeProject]);
+
+  // 최종 청구 합계 수동 조정값 동기화 (외화/원화 자동 대응)
+  // 프로젝트 전환, 보정 모드 변경, 외화 표기 토글, 환율 변경 시에만 입력창 값을 초기화하여 타이핑 중 강제 덮어쓰기를 원천 방지합니다.
+  useEffect(() => {
+    if (!activeProject) {
+      setCustomAmountInput('');
+      return;
+    }
+    
+    if (activeProject.totalCorrectionName === '수동 금액 조정') {
+      const grandTotal = projectSummary.finalGrandTotal ?? projectSummary.grandTotal;
+      if (activeProject.useForeignCurrency && activeProject.exchangeRate) {
+        const foreignVal = grandTotal / activeProject.exchangeRate;
+        setCustomAmountInput(foreignVal.toFixed(2));
+      } else {
+        setCustomAmountInput(grandTotal.toString());
+      }
+    } else {
+      setCustomAmountInput('');
+    }
+  }, [
+    activeProject?.id, 
+    activeProject?.totalCorrectionName, 
+    activeProject?.useForeignCurrency, 
+    activeProject?.exchangeRate
+  ]);
+
+  // 환율이나 외화 설정, 혹은 공급가액 소계가 바뀔 때, 수동 조정 비율(totalCorrectionRate)을 입력된 수동 금액 기준으로 자동 재계산
+  useEffect(() => {
+    if (!activeProject || activeProject.totalCorrectionName !== '수동 금액 조정') return;
+    if (!customAmountInput) return;
+
+    const numVal = Number(customAmountInput);
+    if (isNaN(numVal) || numVal <= 0) return;
+
+    const supplyTotal = projectSummary.supplyTotal;
+    let customGrandTotalInKRW = numVal;
+
+    // 외화 표기가 활성화되어 있다면 새 환율 기준으로 원화 환산
+    if (activeProject.useForeignCurrency && activeProject.exchangeRate) {
+      customGrandTotalInKRW = Math.round(numVal * activeProject.exchangeRate);
+    }
+
+    const finalSupply = Math.round(customGrandTotalInKRW / 1.1);
+    const totalCorrectionAmount = finalSupply - supplyTotal;
+    const rate = supplyTotal > 0 ? totalCorrectionAmount / supplyTotal : 0;
+
+    // 무한 루프 방지를 위해 요율 차이가 유의미할 때만 업데이트 수행
+    if (Math.abs((activeProject.totalCorrectionRate || 0) - rate) > 0.00001) {
+      handleUpdateProjectField('totalCorrectionRate', rate);
+    }
+  }, [
+    activeProject?.exchangeRate, 
+    activeProject?.useForeignCurrency, 
+    projectSummary.supplyTotal
+  ]);
+
+  // --- 고객사 CRUD 핸들러 ---
+  const handleSaveClient = async (client: ClientInfo) => {
+    const idx = clients.findIndex(c => c.id === client.id);
+    let updated: ClientInfo[];
+    if (idx > -1) {
+      updated = [...clients];
+      updated[idx] = client;
+    } else {
+      updated = [client, ...clients];
+    }
+    setClients(updated);
+    await StorageAPI.saveClient(client);
+    setIsClientCreateModalOpen(false);
+    setEditingClient(null);
+  };
+
+  const handleDeleteClient = async (id: string) => {
+    if (confirm('이 고객사를 주소록에서 정말 삭제하시겠습니까?')) {
+      const updated = clients.filter(c => c.id !== id);
+      setClients(updated);
+      await StorageAPI.deleteClient(id);
+    }
+  };
+
+  // --- 프로젝트 워크플로우 상태 변경 핸들러 ---
+  const handleUpdateProjectStatus = async (projectId: string, newStatus: 'draft' | 'invoicing' | 'completed') => {
+    const updated = projects.map(p => {
+      if (p.id === projectId) {
+        return { ...p, status: newStatus };
+      }
+      return p;
+    });
+    await updateProjectsState(updated);
+  };
+
+  // --- 고객사별 대시보드 정밀 다중 지표 통계 연산 ---
+  interface ClientStatEntry {
+    name: string;
+    count: number;
+    quoteTotalKrw: number;
+    billingTotalKrw: number;
+    invoicedTotalKrw: number;
+    completedTotalKrw: number;
+    quoteForeign: Record<string, number>;
+    billingForeign: Record<string, number>;
+    invoicedForeign: Record<string, number>;
+    completedForeign: Record<string, number>;
+    totalMd: number;
+    minDate: string;
+    maxDate: string;
+    months?: number;
+    monthlyAverageBilling?: number;
+    monthlyAverageMd?: number;
+    monthlyAverageBillingForeign?: Record<string, number>;
+  }
+
+  const clientStats = useMemo(() => {
+    const stats: Record<string, ClientStatEntry> = {};
+    
+    projects.forEach(proj => {
+      let supplyTotal = 0;
+      let vatTotal = 0;
+      let projectMd = 0;
+      
+      proj.sections.forEach(sec => {
+        sec.rows.forEach(row => {
+          if (row.isSelected) {
+            supplyTotal += row.supplyPrice;
+            vatTotal += row.vat;
+            
+            // 인건비 항목이거나 단위가 MD인 경우에 대해 프로젝트 총 공수(MD) 집계
+            if (row.unit === 'MD' || row.formulaType === 'PEOPLE_x_DAYS_x_PRICE') {
+              projectMd += row.quantity || 0;
+            }
+          }
+        });
+      });
+      const grandTotal = supplyTotal + vatTotal;
+      const correctionRate = proj.totalCorrectionRate || 0;
+      const finalSupplyTotal = supplyTotal + Math.round(supplyTotal * correctionRate);
+      const finalVatTotal = correctionRate !== 0 ? Math.floor(finalSupplyTotal * 0.1) : vatTotal;
+      const finalGrandTotal = finalSupplyTotal + finalVatTotal;
+
+      // 외화 청구 연동
+      const hasForeign = proj.useForeignCurrency && proj.exchangeRate && proj.exchangeRate > 0;
+      const currency = proj.foreignCurrency || 'USD';
+      const quoteForeignAmt = hasForeign ? grandTotal / proj.exchangeRate! : 0;
+      const billingForeignAmt = hasForeign ? finalGrandTotal / proj.exchangeRate! : 0;
+
+      const clientKey = proj.clientName || '미지정 고객사';
+      if (!stats[clientKey]) {
+        stats[clientKey] = {
+          name: clientKey,
+          count: 0,
+          quoteTotalKrw: 0,
+          billingTotalKrw: 0,
+          invoicedTotalKrw: 0,
+          completedTotalKrw: 0,
+          quoteForeign: {},
+          billingForeign: {},
+          invoicedForeign: {},
+          completedForeign: {},
+          totalMd: 0,
+          minDate: proj.estimateDate || '',
+          maxDate: proj.estimateDate || ''
+        };
+      }
+
+      const entry = stats[clientKey];
+      entry.count += 1;
+      entry.quoteTotalKrw += grandTotal;
+      entry.billingTotalKrw += finalGrandTotal;
+      entry.totalMd += projectMd;
+
+      const pDate = proj.estimateDate || '';
+      if (pDate) {
+        if (!entry.minDate || pDate < entry.minDate) entry.minDate = pDate;
+        if (!entry.maxDate || pDate > entry.maxDate) entry.maxDate = pDate;
+      }
+
+      if (proj.status === 'invoicing' || proj.status === 'completed') {
+        entry.invoicedTotalKrw += finalGrandTotal;
+      }
+      if (proj.status === 'completed') {
+        entry.completedTotalKrw += finalGrandTotal;
+      }
+
+      if (hasForeign) {
+        entry.quoteForeign[currency] = (entry.quoteForeign[currency] || 0) + quoteForeignAmt;
+        entry.billingForeign[currency] = (entry.billingForeign[currency] || 0) + billingForeignAmt;
+        
+        if (proj.status === 'invoicing' || proj.status === 'completed') {
+          entry.invoicedForeign[currency] = (entry.invoicedForeign[currency] || 0) + billingForeignAmt;
+        }
+        if (proj.status === 'completed') {
+          entry.completedForeign[currency] = (entry.completedForeign[currency] || 0) + billingForeignAmt;
+        }
+      }
+    });
+
+    // 월평균 청구액 및 월평균 MD 추가 연산 (프로젝트 발행 개월 수 기준 분모 산정)
+    return Object.values(stats).map(entry => {
+      let months = 1;
+      if (entry.minDate && entry.maxDate) {
+        const minD = new Date(entry.minDate);
+        const maxD = new Date(entry.maxDate);
+        if (!isNaN(minD.getTime()) && !isNaN(maxD.getTime())) {
+          const yearDiff = maxD.getFullYear() - minD.getFullYear();
+          const monthDiff = maxD.getMonth() - minD.getMonth();
+          months = yearDiff * 12 + monthDiff + 1;
+        }
+      }
+      if (months <= 0) months = 1;
+
+      const monthlyAverageBillingForeign: Record<string, number> = {};
+      Object.entries(entry.billingForeign).forEach(([curr, amt]) => {
+        monthlyAverageBillingForeign[curr] = amt / months;
+      });
+
+      return {
+        ...entry,
+        months,
+        monthlyAverageBilling: Math.round(entry.billingTotalKrw / months),
+        monthlyAverageMd: Math.round((entry.totalMd / months) * 10) / 10,
+        monthlyAverageBillingForeign
+      };
+    }).sort((a, b) => b.billingTotalKrw - a.billingTotalKrw);
+  }, [projects]);
+
+  // 외화 집계 렌더링 헬퍼 함수
+  const formatForeignStats = (foreignMap: Record<string, number>) => {
+    const activeCurrencies = Object.entries(foreignMap).filter(([_, amt]) => amt > 0);
+    if (activeCurrencies.length === 0) return null;
+    
+    const currencySymbols: Record<string, string> = { USD: '$', EUR: '€', JPY: '¥', CNY: '¥' };
+    
+    return activeCurrencies.map(([currency, amount]) => {
+      const symbol = currencySymbols[currency] || '';
+      return `${symbol}${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${currency})`;
+    }).join(', ');
+  };
 
   // --- 설정 (공급자 정보) 저장 ---
   const handleSaveVendorInfo = async (e: React.FormEvent) => {
@@ -565,6 +1104,17 @@ export default function App() {
       const reader = new FileReader();
       reader.onloadend = () => {
         setVendorInfo({ ...vendorInfo, sealImage: reader.result as string });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleLogoImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setVendorInfo({ ...vendorInfo, logoImage: reader.result as string });
       };
       reader.readAsDataURL(file);
     }
@@ -1012,59 +1562,211 @@ export default function App() {
                   </button>
                 </div>
 
+                {clientStats.length > 0 && (
+                  <div className="card" style={{ marginBottom: '24px', padding: '20px', overflowX: 'auto' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', fontSize: '15px', fontWeight: '700', color: 'var(--text-primary)' }}>
+                      <Building2 size={18} className="color-blue" />
+                      <span>고객사별 정밀 누적 통계</span>
+                    </div>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', minWidth: '1100px' }}>
+                      <thead>
+                        <tr style={{ borderBottom: '2px solid var(--border-color)', color: 'var(--text-secondary)', textAlign: 'left' }}>
+                          <th style={{ padding: '10px 8px', fontWeight: '700' }}>고객사명</th>
+                          <th style={{ padding: '10px 8px', fontWeight: '700', textAlign: 'right' }}>실제 견적액 (소계)</th>
+                          <th style={{ padding: '10px 8px', fontWeight: '700', textAlign: 'right' }}>청구 견적액 (최종)</th>
+                          <th style={{ padding: '10px 8px', fontWeight: '700', textAlign: 'right', color: '#e65100' }}>청구액 누적</th>
+                          <th style={{ padding: '10px 8px', fontWeight: '700', textAlign: 'right', color: '#2e7d32' }}>지불완료액 누적</th>
+                          <th style={{ padding: '10px 8px', fontWeight: '700', textAlign: 'right', color: '#1976d2' }}>월평균 청구액</th>
+                          <th style={{ padding: '10px 8px', fontWeight: '700', textAlign: 'right', color: '#673ab7' }}>월평균 MD</th>
+                          <th style={{ padding: '10px 8px', fontWeight: '700', textAlign: 'center', width: '60px' }}>건수</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {clientStats.map(stat => {
+                          const quoteFx = formatForeignStats(stat.quoteForeign);
+                          const billingFx = formatForeignStats(stat.billingForeign);
+                          const invoicedFx = formatForeignStats(stat.invoicedForeign);
+                          const completedFx = formatForeignStats(stat.completedForeign);
+                          const monthlyBillingFx = formatForeignStats(stat.monthlyAverageBillingForeign || {});
+
+                          return (
+                            <tr key={stat.name} style={{ borderBottom: '1px solid var(--border-color)' }} className="stat-table-row">
+                              <td style={{ padding: '12px 8px', fontWeight: '700', color: 'var(--text-primary)' }}>{stat.name}</td>
+                              <td style={{ padding: '12px 8px', textAlign: 'right' }}>
+                                <div style={{ fontWeight: '600' }}>₩{stat.quoteTotalKrw.toLocaleString()}</div>
+                                {quoteFx && <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '2px' }}>{quoteFx}</div>}
+                              </td>
+                              <td style={{ padding: '12px 8px', textAlign: 'right' }}>
+                                <div style={{ fontWeight: '600', color: 'var(--color-blue)' }}>₩{stat.billingTotalKrw.toLocaleString()}</div>
+                                {billingFx && <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '2px' }}>{billingFx}</div>}
+                              </td>
+                              <td style={{ padding: '12px 8px', textAlign: 'right', color: '#e65100' }}>
+                                <div style={{ fontWeight: '600' }}>₩{stat.invoicedTotalKrw.toLocaleString()}</div>
+                                {invoicedFx && <div style={{ fontSize: '11px', color: '#f57c00', marginTop: '2px' }}>{invoicedFx}</div>}
+                              </td>
+                              <td style={{ padding: '12px 8px', textAlign: 'right', color: '#2e7d32' }}>
+                                <div style={{ fontWeight: '600' }}>₩{stat.completedTotalKrw.toLocaleString()}</div>
+                                {completedFx && <div style={{ fontSize: '11px', color: '#388e3c', marginTop: '2px' }}>{completedFx}</div>}
+                              </td>
+                              <td style={{ padding: '12px 8px', textAlign: 'right', color: '#1976d2' }}>
+                                <div style={{ fontWeight: '600' }}>₩{(stat.monthlyAverageBilling || 0).toLocaleString()}</div>
+                                {monthlyBillingFx && <div style={{ fontSize: '11px', color: '#1976d2', opacity: 0.8, marginTop: '2px' }}>{monthlyBillingFx}</div>}
+                              </td>
+                              <td style={{ padding: '12px 8px', textAlign: 'right', color: '#673ab7' }}>
+                                <div style={{ fontWeight: '600' }}>{(stat.monthlyAverageMd || 0).toLocaleString()} MD</div>
+                              </td>
+                              <td style={{ padding: '12px 8px', textAlign: 'center', color: 'var(--text-secondary)', fontWeight: '500' }}>{stat.count}건</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                    <style>{`
+                      .stat-table-row:hover {
+                        background-color: var(--bg-secondary);
+                      }
+                    `}</style>
+                  </div>
+                )}
+
                 <div className="project-list-grid">
-                  {projects.map(proj => {
-                    let total = 0;
+                  {[...projects]
+                    .sort((a, b) => {
+                      const dateA = a.estimateDate || '';
+                      const dateB = b.estimateDate || '';
+                      if (dateA !== dateB) {
+                        return dateA.localeCompare(dateB);
+                      }
+                      const timeA = a.createdAt || '';
+                      const timeB = b.createdAt || '';
+                      if (timeA !== timeB) {
+                        return timeA.localeCompare(timeB);
+                      }
+                      return a.id.localeCompare(b.id);
+                    })
+                    .map(proj => {
+                    // 1. 보정 전 견적금액(grandTotal) 계산
+                    let supplyTotal = 0;
+                    let vatTotal = 0;
                     proj.sections.forEach(sec => {
                       sec.rows.forEach(row => {
-                        if (row.isSelected) total += row.supplyPrice + row.vat;
+                        if (row.isSelected) {
+                          supplyTotal += row.supplyPrice;
+                          vatTotal += row.vat;
+                        }
                       });
                     });
+                    const grandTotal = supplyTotal + vatTotal;
+
+                    // 2. 보정 후 최종 청구금액(finalGrandTotal) 계산
+                    const correctionRate = proj.totalCorrectionRate || 0;
+                    const finalSupplyTotal = supplyTotal + Math.round(supplyTotal * correctionRate);
+                    const finalVatTotal = correctionRate !== 0 ? Math.floor(finalSupplyTotal * 0.1) : vatTotal;
+                    const finalGrandTotal = finalSupplyTotal + finalVatTotal;
+
+
+
+                    // 외화 정보 추출
+                    const hasForeign = proj.useForeignCurrency && proj.exchangeRate && proj.exchangeRate > 0;
+                    const fxSymbol = proj.foreignCurrency === 'USD' ? '$' : 
+                                     proj.foreignCurrency === 'EUR' ? '€' : 
+                                     proj.foreignCurrency === 'JPY' ? '¥' : 
+                                     proj.foreignCurrency === 'CNY' ? '¥' : '';
+                    
+                    const quoteFxAmt = hasForeign ? grandTotal / proj.exchangeRate! : 0;
+                    const billingFxAmt = hasForeign ? finalGrandTotal / proj.exchangeRate! : 0;
 
                     return (
                       <div 
                         key={proj.id} 
                         className="project-card"
                         onClick={() => setSelectedProjectId(proj.id)}
+                        style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '260px' }}
                       >
                         <div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                             <span className={`project-card-badge ${proj.projectType}`}>
                               {proj.projectType === 'IT' ? 'IT 개발' :
                                proj.projectType === 'DESIGN' ? '디자인' :
                                proj.projectType === 'BUILD' ? '제작/시공' : '기타'}
                             </span>
+                            
+                            {/* 상태 배지 셀렉터 탑재 */}
+                            <select
+                              value={proj.status || 'draft'}
+                              onChange={(e) => {
+                                e.stopPropagation(); // 카드 클릭 이동 방지
+                                handleUpdateProjectStatus(proj.id, e.target.value as 'draft' | 'invoicing' | 'completed');
+                              }}
+                              onClick={(e) => e.stopPropagation()} // 버블링 방지
+                              style={{
+                                padding: '2px 8px',
+                                fontSize: '11px',
+                                fontWeight: '700',
+                                borderRadius: '12px',
+                                border: 'none',
+                                cursor: 'pointer',
+                                outline: 'none',
+                                color: proj.status === 'completed' ? '#2e7d32' : 
+                                       proj.status === 'invoicing' ? '#e65100' : '#475569',
+                                backgroundColor: proj.status === 'completed' ? '#e8f5e9' : 
+                                                 proj.status === 'invoicing' ? '#fff3e0' : '#f1f5f9',
+                                transition: 'all 0.2s'
+                              }}
+                              title="프로젝트의 현재 워크플로우 상태를 변경합니다"
+                            >
+                              <option value="draft">작성중</option>
+                              <option value="invoicing">청구중</option>
+                              <option value="completed">지급완료</option>
+                            </select>
                           </div>
-                          <div className="project-card-title">{proj.title}</div>
-                          <div className="project-card-client">{proj.clientName}</div>
+                          
+                          <div className="project-card-title" style={{ fontSize: '15px', fontWeight: '700', lineHeight: '1.4', marginBottom: '6px' }}>{proj.title}</div>
+                          <div className="project-card-client" style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '12px' }}>{proj.clientName}</div>
                         </div>
                         
-                        <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--color-blue)', marginBottom: '8px' }}>
-                          ₩{total.toLocaleString()}
-                        </div>
+                        <div>
+                          {/* 금액 표기 영역 고도화 */}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', borderTop: '1px solid var(--border-color)', paddingTop: '10px', marginBottom: '12px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                              <span>견적금액</span>
+                              <span style={{ fontWeight: '600' }}>
+                                ₩{grandTotal.toLocaleString()}
+                                {hasForeign && ` (${fxSymbol}${quoteFxAmt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`}
+                              </span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: 'var(--color-blue)', fontWeight: '700' }}>
+                              <span>청구금액</span>
+                              <span>
+                                ₩{finalGrandTotal.toLocaleString()}
+                                {hasForeign && ` (${fxSymbol}${billingFxAmt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`}
+                              </span>
+                            </div>
+                          </div>
 
-                        <div className="project-card-footer">
-                          <span className="project-card-date">
-                            견적일: {proj.estimateDate}
-                          </span>
-                          <div style={{ display: 'flex', gap: '4px' }}>
-                            <button 
-                              type="button"
-                              className="btn-icon-only" 
-                              onClick={(e) => handleDuplicateProject(proj, e)}
-                              title="견적 복제"
-                            >
-                              <Copy size={14} />
-                            </button>
-                            <button 
-                              type="button"
-                              className="btn-icon-only" 
-                              style={{ color: 'var(--color-red)' }}
-                              onClick={(e) => handleDeleteProject(proj.id, e)}
-                              title="견적 삭제"
-                            >
-                              <Trash2 size={14} />
-                            </button>
+                          <div className="project-card-footer" style={{ borderTop: 'none', paddingTop: 0 }}>
+                            <span className="project-card-date" style={{ fontSize: '11px' }}>
+                              견적일: {proj.estimateDate}
+                            </span>
+                            <div style={{ display: 'flex', gap: '4px' }}>
+                              <button 
+                                type="button"
+                                className="btn-icon-only" 
+                                onClick={(e) => handleDuplicateProject(proj, e)}
+                                title="견적 복제"
+                              >
+                                <Copy size={14} />
+                              </button>
+                              <button 
+                                type="button"
+                                className="btn-icon-only" 
+                                style={{ color: 'var(--color-red)' }}
+                                onClick={(e) => handleDeleteProject(proj.id, e)}
+                                title="견적 삭제"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -1082,7 +1784,7 @@ export default function App() {
               // 견적서 에디터 화면
               activeProject && (
                 <>
-                  <div className="workspace-header">
+                  <div className="workspace-header" style={{ marginBottom: '16px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                       <button type="button" className="btn btn-secondary btn-icon-only" onClick={() => setSelectedProjectId(null)}>
                         <ArrowLeft size={18} />
@@ -1110,6 +1812,26 @@ export default function App() {
                     </div>
                   </div>
 
+                  {/* 서브 탭 바 추가 */}
+                  <div className="tab-nav" style={{ marginBottom: '20px' }}>
+                    <button 
+                      type="button"
+                      className={`tab-button ${activeSubTab === 'estimate' ? 'active' : ''}`}
+                      onClick={() => setActiveSubTab('estimate')}
+                    >
+                      견적서 원장 작성
+                    </button>
+                    <button 
+                      type="button"
+                      className={`tab-button ${activeSubTab === 'wbs' ? 'active' : ''}`}
+                      onClick={() => setActiveSubTab('wbs')}
+                    >
+                      업무 범위 명세서 (WBS)
+                    </button>
+                  </div>
+
+                  {activeSubTab === 'estimate' ? (
+
                   <div className="editor-layout">
                     {/* 에디터 본문 */}
                     <div className="editor-main">
@@ -1128,12 +1850,25 @@ export default function App() {
                           </div>
                           <div className="form-group">
                             <label className="form-label">수신처 (고객사명)</label>
-                            <input 
-                              type="text" 
-                              className="input-text"
-                              value={activeProject.clientName}
-                              onChange={(e) => handleUpdateProjectField('clientName', e.target.value)}
-                            />
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                              <input 
+                                type="text" 
+                                className="input-text"
+                                value={activeProject.clientName}
+                                onChange={(e) => handleUpdateProjectField('clientName', e.target.value)}
+                                style={{ flex: 1 }}
+                              />
+                              <button 
+                                type="button" 
+                                className="btn btn-secondary" 
+                                onClick={() => setIsClientImportModalOpen(true)}
+                                style={{ gap: '6px', padding: '0 12px', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', height: '38px' }}
+                                title="고객사 주소록에서 불러오기"
+                              >
+                                <Building2 size={15} />
+                                불러오기
+                              </button>
+                            </div>
                           </div>
                           <div className="form-group">
                             <label className="form-label">견적 발행일</label>
@@ -1141,7 +1876,30 @@ export default function App() {
                               type="date" 
                               className="input-text"
                               value={activeProject.estimateDate}
-                              onChange={(e) => handleUpdateProjectField('estimateDate', e.target.value)}
+                              onChange={(e) => {
+                                const newDate = e.target.value;
+                                if (!activeProject) return;
+                                
+                                // 30일 뒤 유효기간 자동 계산
+                                const dateObj = new Date(newDate);
+                                let newExpiry = activeProject.expiryDate;
+                                if (!isNaN(dateObj.getTime())) {
+                                  dateObj.setDate(dateObj.getDate() + 30);
+                                  newExpiry = dateObj.toISOString().split('T')[0];
+                                }
+
+                                const updated = projects.map(p => {
+                                  if (p.id === activeProject.id) {
+                                    return { 
+                                      ...p, 
+                                      estimateDate: newDate,
+                                      expiryDate: newExpiry
+                                    };
+                                  }
+                                  return p;
+                                });
+                                updateProjectsState(updated);
+                              }}
                             />
                           </div>
                           <div className="form-group">
@@ -1153,6 +1911,173 @@ export default function App() {
                               onChange={(e) => handleUpdateProjectField('expiryDate', e.target.value)}
                             />
                           </div>
+                        </div>
+                      </div>
+
+                      {/* 총괄 옵션 설정 (할인/할증 및 외화 설정) */}
+                      <div className="card" style={{ marginTop: '16px' }}>
+                        <div style={{ fontSize: '15px', fontWeight: '700', marginBottom: '16px', color: 'var(--text-primary)' }}>총괄 옵션 설정</div>
+                        <div className="grid-2">
+                          <div className="form-group">
+                            <label className="form-label">총괄 할인 / 할증 (보정)</label>
+                            <select
+                              className="select-input"
+                              value={activeProject.totalCorrectionRate || 0}
+                              onChange={(e) => {
+                                const rate = Number(e.target.value);
+                                const preset = TOTAL_CORRECTION_PRESETS.find(p => p.rate === rate);
+                                handleUpdateProjectField('totalCorrectionRate', rate);
+                                handleUpdateProjectField('totalCorrectionName', preset ? preset.name : '');
+                              }}
+                            >
+                              {TOTAL_CORRECTION_PRESETS.map((preset) => (
+                                <option key={preset.name} value={preset.rate}>
+                                  {preset.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <div className="form-group">
+                            <label className="form-label">
+                              {activeProject.useForeignCurrency && activeProject.exchangeRate
+                                ? `최종 청구 합계 직접 입력 (수동 조정 - ${activeProject.foreignCurrency} 기준)`
+                                : '최종 청구 합계 직접 입력 (수동 조정 - KRW 기준)'}
+                            </label>
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                              <input
+                                type="number"
+                                className="input-text"
+                                style={{ flex: 1 }}
+                                step="any"
+                                placeholder={
+                                  activeProject.useForeignCurrency && activeProject.exchangeRate
+                                    ? '최종 외화 합계 직접 입력'
+                                    : '최종 원화 합계 직접 입력'
+                                }
+                                value={customAmountInput}
+                                onChange={(e) => setCustomAmountInput(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    handleApplyCustomAmount();
+                                  }
+                                }}
+                              />
+                              <button
+                                type="button"
+                                onClick={handleApplyCustomAmount}
+                                style={{
+                                  padding: '0 16px',
+                                  backgroundColor: 'var(--color-blue, #2563eb)',
+                                  color: '#ffffff',
+                                  border: 'none',
+                                  borderRadius: '6px',
+                                  cursor: 'pointer',
+                                  fontWeight: '600',
+                                  fontSize: '13px',
+                                  transition: 'all 0.2s ease',
+                                  whiteSpace: 'nowrap'
+                                }}
+                                onMouseOver={(e) => (e.currentTarget.style.backgroundColor = '#1d4ed8')}
+                                onMouseOut={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-blue, #2563eb)')}
+                              >
+                                적용
+                              </button>
+                            </div>
+                            <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '4px', display: 'block' }}>
+                              {activeProject.useForeignCurrency && activeProject.exchangeRate
+                                ? `* 외화 금액을 직접 입력하면 환율(${activeProject.exchangeRate}원)을 기준으로 원화 할인율이 역산됩니다.`
+                                : '* 원화 금액을 직접 입력하면 할인율이 역산되어 일괄 반영됩니다.'}
+                            </span>
+                          </div>
+                          
+                          <div className="form-group">
+                            <label className="form-label">외화 환산 설정</label>
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', height: '38px' }}>
+                              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', cursor: 'pointer' }}>
+                                <input
+                                  type="checkbox"
+                                  checked={activeProject.useForeignCurrency || false}
+                                  onChange={(e) => handleUpdateProjectField('useForeignCurrency', e.target.checked)}
+                                />
+                                외화 표기 활성화
+                              </label>
+                            </div>
+                          </div>
+
+                          {activeProject.useForeignCurrency && (
+                            <>
+                              <div className="form-group">
+                                <label className="form-label">표기 외화 종류</label>
+                                <select
+                                  className="select-input"
+                                  value={activeProject.foreignCurrency || 'USD'}
+                                  onChange={(e) => handleUpdateProjectField('foreignCurrency', e.target.value as 'EUR' | 'USD' | 'JPY' | 'CNY')}
+                                >
+                                  <option value="USD">USD ($)</option>
+                                  <option value="EUR">EUR (€)</option>
+                                  <option value="JPY">JPY (¥)</option>
+                                  <option value="CNY">CNY (¥)</option>
+                                </select>
+                              </div>
+                              <div className="form-group">
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                                  <label className="form-label" style={{ margin: 0 }}>적용 환율 (1 외화 = OOO KRW)</label>
+                                  <div style={{ display: 'flex', gap: '6px' }}>
+                                    <button
+                                      type="button"
+                                      onClick={handleFetchAutoExchangeRate}
+                                      style={{
+                                        padding: '4px 10px',
+                                        fontSize: '11px',
+                                        backgroundColor: '#3b82f6',
+                                        color: '#ffffff',
+                                        border: 'none',
+                                        borderRadius: '4px',
+                                        cursor: 'pointer',
+                                        fontWeight: '500',
+                                        transition: 'all 0.2s ease'
+                                      }}
+                                      onMouseOver={(e) => (e.currentTarget.style.backgroundColor = '#2563eb')}
+                                      onMouseOut={(e) => (e.currentTarget.style.backgroundColor = '#3b82f6')}
+                                    >
+                                      자동 환율 가져오기
+                                    </button>
+                                    <a
+                                      href="https://www.kebhana.com/m/sub/sub03.do"
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      style={{
+                                        padding: '4px 10px',
+                                        fontSize: '11px',
+                                        backgroundColor: '#10b981',
+                                        color: '#ffffff',
+                                        textDecoration: 'none',
+                                        borderRadius: '4px',
+                                        cursor: 'pointer',
+                                        fontWeight: '500',
+                                        transition: 'all 0.2s ease',
+                                        display: 'inline-flex',
+                                        alignItems: 'center'
+                                      }}
+                                      onMouseOver={(e) => (e.currentTarget.style.backgroundColor = '#059669')}
+                                      onMouseOut={(e) => (e.currentTarget.style.backgroundColor = '#10b981')}
+                                    >
+                                      하나은행 환율조회
+                                    </a>
+                                  </div>
+                                </div>
+                                <input
+                                  type="number"
+                                  className="input-text"
+                                  value={activeProject.exchangeRate || ''}
+                                  onChange={(e) => handleUpdateProjectField('exchangeRate', Number(e.target.value))}
+                                  placeholder="예: 1350"
+                                />
+                              </div>
+                            </>
+                          )}
                         </div>
                       </div>
 
@@ -1246,7 +2171,7 @@ export default function App() {
                                             placeholder="품명 및 항목명"
                                             style={{ flex: 1 }}
                                           />
-                                          {(row.category.includes('인건비') || row.formulaType === 'PEOPLE_x_DAYS_x_PRICE') && (
+                                          {((row.category && row.category.includes('인건비')) || row.formulaType === 'PEOPLE_x_DAYS_x_PRICE') && (
                                             <select
                                               value={row.rank || '해당 없음'}
                                               onChange={(e) => handleUpdateRowField(section.id, row.id, 'rank', e.target.value)}
@@ -1436,20 +2361,96 @@ export default function App() {
                           </span>
                         </div>
 
-                        <div className="summary-row">
-                          <span>총 공급가액</span>
-                          <span>₩{projectSummary.supplyTotal.toLocaleString()}</span>
-                        </div>
+                        {projectSummary.totalCorrectionRate !== 0 ? (
+                          <>
+                            <div className="summary-row">
+                              <span>공급가액 소계</span>
+                              <span>₩{projectSummary.supplyTotal.toLocaleString()}</span>
+                            </div>
 
-                        <div className="summary-row">
-                          <span>총 부가세</span>
-                          <span>₩{projectSummary.vatTotal.toLocaleString()}</span>
-                        </div>
+                            <div className="summary-row">
+                              <span>부가세 소계</span>
+                              <span>₩{projectSummary.vatTotal.toLocaleString()}</span>
+                            </div>
 
-                        <div className="summary-row total">
-                          <span>최종 합계</span>
-                          <span>₩{projectSummary.grandTotal.toLocaleString()}</span>
-                        </div>
+                            <div className="summary-row" style={{ color: projectSummary.totalCorrectionRate > 0 ? 'var(--color-blue)' : '#e65100', fontWeight: '500' }}>
+                              <span>
+                                {projectSummary.totalCorrectionName || (projectSummary.totalCorrectionRate > 0 ? '총괄 할증' : '총괄 할인')}
+                                {` (${(projectSummary.totalCorrectionRate * 100).toFixed(2)}%)`}
+                              </span>
+                              <span>
+                                {projectSummary.totalCorrectionAmount > 0 ? '+' : ''}
+                                ₩{projectSummary.totalCorrectionAmount.toLocaleString()}
+                              </span>
+                            </div>
+
+                            <div className="summary-row" style={{ color: projectSummary.totalCorrectionRate > 0 ? 'var(--color-blue)' : '#e65100', fontSize: '12px', paddingLeft: '8px' }}>
+                              <span>ㄴ 부가세 변동</span>
+                              <span>
+                                {((projectSummary.finalVatTotal ?? 0) - projectSummary.vatTotal) > 0 ? '+' : ''}
+                                ₩{((projectSummary.finalVatTotal ?? 0) - projectSummary.vatTotal).toLocaleString()}
+                              </span>
+                            </div>
+
+                            {activeProject.useForeignCurrency && activeProject.exchangeRate ? (
+                              <>
+                                <div className="summary-row total">
+                                  <span>최종 합계 ({activeProject.foreignCurrency})</span>
+                                  <span style={{ color: 'var(--color-blue)', fontSize: '18px', fontWeight: '800' }}>
+                                    {activeProject.foreignCurrency === 'USD' ? '$' : 
+                                     activeProject.foreignCurrency === 'EUR' ? '€' : 
+                                     activeProject.foreignCurrency === 'JPY' ? '¥' : 
+                                     activeProject.foreignCurrency === 'CNY' ? '¥' : ''}
+                                    {((projectSummary.finalGrandTotal ?? projectSummary.grandTotal) / activeProject.exchangeRate).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  </span>
+                                </div>
+                                <div style={{ fontSize: '12px', color: 'var(--text-secondary)', textAlign: 'right', marginTop: '-8px', marginBottom: '8px', fontWeight: '500' }}>
+                                  원화 환산: ₩{(projectSummary.finalGrandTotal ?? projectSummary.grandTotal).toLocaleString()}
+                                </div>
+                              </>
+                            ) : (
+                              <div className="summary-row total">
+                                <span>최종 합계</span>
+                                <span>₩{(projectSummary.finalGrandTotal ?? projectSummary.grandTotal).toLocaleString()}</span>
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <>
+                            <div className="summary-row">
+                              <span>총 공급가액</span>
+                              <span>₩{projectSummary.supplyTotal.toLocaleString()}</span>
+                            </div>
+
+                            <div className="summary-row">
+                              <span>총 부가세</span>
+                              <span>₩{projectSummary.vatTotal.toLocaleString()}</span>
+                            </div>
+
+                            {activeProject.useForeignCurrency && activeProject.exchangeRate ? (
+                              <>
+                                <div className="summary-row total">
+                                  <span>최종 합계 ({activeProject.foreignCurrency})</span>
+                                  <span style={{ color: 'var(--color-blue)', fontSize: '18px', fontWeight: '800' }}>
+                                    {activeProject.foreignCurrency === 'USD' ? '$' : 
+                                     activeProject.foreignCurrency === 'EUR' ? '€' : 
+                                     activeProject.foreignCurrency === 'JPY' ? '¥' : 
+                                     activeProject.foreignCurrency === 'CNY' ? '¥' : ''}
+                                    {(projectSummary.grandTotal / activeProject.exchangeRate).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  </span>
+                                </div>
+                                <div style={{ fontSize: '12px', color: 'var(--text-secondary)', textAlign: 'right', marginTop: '-8px', marginBottom: '8px', fontWeight: '500' }}>
+                                  원화 환산: ₩{projectSummary.grandTotal.toLocaleString()}
+                                </div>
+                              </>
+                            ) : (
+                              <div className="summary-row total">
+                                <span>최종 합계</span>
+                                <span>₩{projectSummary.grandTotal.toLocaleString()}</span>
+                              </div>
+                            )}
+                          </>
+                        )}
                       </div>
 
                       <div className="summary-panel" style={{ backgroundColor: 'var(--color-blue-light)', borderColor: 'rgba(49,130,246,0.2)' }}>
@@ -1463,8 +2464,16 @@ export default function App() {
                       </div>
                     </div>
                   </div>
-                </>
-              )
+                ) : (
+                  <WbsEditor
+                    wbs={activeProject.wbs || []}
+                    availableRoles={['기획/PM', 'UI/UX 디자인', '프론트엔드 개발', '백엔드 개발', 'QA/품질검증', '기타']}
+                    onChange={(updatedWbs) => handleUpdateProjectField('wbs', updatedWbs)}
+                    onSyncToEstimate={handleSyncWbsToEstimate}
+                  />
+                )}
+              </>
+            )
             )}
           </div>
         )}
@@ -1482,9 +2491,13 @@ export default function App() {
                   <button type="button" className="btn btn-primary" onClick={() => { setEditingItem(null); setIsItemCreateModalOpen(true); }}>
                     <Plus size={16} /> 새 기준 단가 등록
                   </button>
-                ) : (
+                ) : librarySubTab === 'packages' ? (
                   <button type="button" className="btn btn-primary" onClick={() => { setEditingPackage(null); setIsPackageCreateModalOpen(true); }}>
                     <Plus size={16} /> 새 패키지 세트 구성
+                  </button>
+                ) : (
+                  <button type="button" className="btn btn-primary" onClick={() => { setEditingClient(null); setIsClientCreateModalOpen(true); }}>
+                    <Plus size={16} /> 새 고객사 등록
                   </button>
                 )}
               </div>
@@ -1504,6 +2517,13 @@ export default function App() {
                 onClick={() => setLibrarySubTab('packages')}
               >
                 항목 세트 (패키지 상품)
+              </button>
+              <button 
+                type="button"
+                className={`tab-button ${librarySubTab === 'clients' ? 'active' : ''}`}
+                onClick={() => setLibrarySubTab('clients')}
+              >
+                고객사 목록 (주소록)
               </button>
             </div>
 
@@ -1695,6 +2715,64 @@ export default function App() {
                 ))}
               </div>
             )}
+
+            {/* 고객사 탭 내용 */}
+            {librarySubTab === 'clients' && (
+              <div className="library-grid">
+                {clients.map(client => (
+                  <div key={client.id} className="library-card" style={{ minHeight: '180px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                    <div>
+                      <div className="library-card-header">
+                        <span className="library-card-badge" style={{ backgroundColor: 'var(--color-blue-light)', color: 'var(--color-blue)' }}>고객사</span>
+                        {client.bizNumber && (
+                          <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>{client.bizNumber}</span>
+                        )}
+                      </div>
+                      <div className="library-card-title" style={{ fontSize: '16px', marginBottom: '8px' }}>{client.name}</div>
+                      
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                        {client.ownerName && <div><strong>대표자:</strong> {client.ownerName}</div>}
+                        {client.managerName && (
+                          <div><strong>담당자:</strong> {client.managerName} {client.managerTel ? `(${client.managerTel})` : ''}</div>
+                        )}
+                        {client.address && (
+                          <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <strong>주소:</strong> {client.address}
+                          </div>
+                        )}
+                        {client.memo && (
+                          <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', fontStyle: 'italic', marginTop: '4px' }}>
+                            * {client.memo}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="library-card-footer" style={{ marginTop: '16px', display: 'flex', gap: '8px' }}>
+                      <button 
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => { setEditingClient(client); setIsClientCreateModalOpen(true); }}
+                      >
+                        수정
+                      </button>
+                      <button 
+                        type="button"
+                        className="btn btn-danger btn-sm"
+                        onClick={() => handleDeleteClient(client.id)}
+                      >
+                        삭제
+                      </button>
+                    </div>
+                  </div>
+                ))}
+                {clients.length === 0 && (
+                  <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '40px 0', color: 'var(--text-tertiary)' }}>
+                    등록된 고객사가 없습니다. 새 고객사를 등록하여 신속하게 불러오기를 사용해 보세요.
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -1705,6 +2783,7 @@ export default function App() {
             setVendorInfo={setVendorInfo}
             onSave={handleSaveVendorInfo}
             onSealUpload={handleSealImageUpload}
+            onLogoUpload={handleLogoImageUpload}
           />
         )}
 
@@ -1883,6 +2962,136 @@ export default function App() {
         projectSummary={projectSummary}
         onClose={() => setIsPreviewModalOpen(false)}
         onPrint={handlePrint}
+      />
+
+      {/* --- F. 라이브러리 탭: 고객사 등록/편집 모달 --- */}
+      {isClientCreateModalOpen && (
+        <div className="modal-overlay no-print" style={{ zIndex: 1200 }}>
+          <div className="modal-container" style={{ maxWidth: '500px' }}>
+            <div className="modal-header">
+              <h2 className="modal-title">{editingClient ? '고객사 정보 수정' : '신규 고객사 등록'}</h2>
+              <button type="button" className="btn btn-secondary btn-icon-only" onClick={() => setIsClientCreateModalOpen(false)}>
+                <X size={18} />
+              </button>
+            </div>
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              const formData = new FormData(e.currentTarget);
+              const clientData: ClientInfo = {
+                id: editingClient?.id || `client-${Date.now()}`,
+                name: formData.get('name') as string,
+                bizNumber: formData.get('bizNumber') as string || undefined,
+                ownerName: formData.get('ownerName') as string || undefined,
+                address: formData.get('address') as string || undefined,
+                managerName: formData.get('managerName') as string || undefined,
+                managerTel: formData.get('managerTel') as string || undefined,
+                memo: formData.get('memo') as string || undefined
+              };
+              handleSaveClient(clientData);
+            }}>
+              <div className="modal-body" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div className="form-group">
+                  <label className="form-label">고객사명 / 상호 <span style={{ color: 'var(--color-red)' }}>*</span></label>
+                  <input 
+                    type="text" 
+                    name="name" 
+                    className="input-text" 
+                    required 
+                    defaultValue={editingClient?.name || ''} 
+                    placeholder="예: 주식회사 에이비씨"
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">사업자등록번호</label>
+                  <input 
+                    type="text" 
+                    name="bizNumber" 
+                    className="input-text" 
+                    defaultValue={editingClient?.bizNumber || ''} 
+                    placeholder="예: 000-00-00000"
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">대표자명</label>
+                  <input 
+                    type="text" 
+                    name="ownerName" 
+                    className="input-text" 
+                    defaultValue={editingClient?.ownerName || ''} 
+                    placeholder="대표자 성명"
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">주소</label>
+                  <input 
+                    type="text" 
+                    name="address" 
+                    className="input-text" 
+                    defaultValue={editingClient?.address || ''} 
+                    placeholder="소재지 주소"
+                  />
+                </div>
+                <div className="grid-2">
+                  <div className="form-group">
+                    <label className="form-label">담당자명</label>
+                    <input 
+                      type="text" 
+                      name="managerName" 
+                      className="input-text" 
+                      defaultValue={editingClient?.managerName || ''} 
+                      placeholder="담당 부서/이름"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">담당자 연락처</label>
+                    <input 
+                      type="text" 
+                      name="managerTel" 
+                      className="input-text" 
+                      defaultValue={editingClient?.managerTel || ''} 
+                      placeholder="연락처 번호"
+                    />
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">메모 / 특이사항</label>
+                  <textarea 
+                    name="memo" 
+                    className="textarea-input" 
+                    defaultValue={editingClient?.memo || ''} 
+                    placeholder="거래처 특이사항 메모"
+                    style={{ minHeight: '60px' }}
+                  />
+                </div>
+              </div>
+              <div className="modal-footer" style={{ padding: '16px 20px' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setIsClientCreateModalOpen(false)}>
+                  취소
+                </button>
+                <button type="submit" className="btn btn-primary">
+                  저장하기
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* --- G. 에디터: 고객사 불러오기 모달 --- */}
+      <ClientImportModal 
+        isOpen={isClientImportModalOpen}
+        onClose={() => setIsClientImportModalOpen(false)}
+        clients={clients}
+        onSelectClient={(client) => {
+          if (!activeProject) return;
+          const updated = projects.map(p => {
+            if (p.id === activeProject.id) {
+              return { ...p, clientName: client.name, clientId: client.id };
+            }
+            return p;
+          });
+          updateProjectsState(updated);
+        }}
       />
 
     </div>

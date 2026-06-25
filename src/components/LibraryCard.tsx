@@ -80,7 +80,7 @@ export function HRGroupCard({ name, items, repItem, onEdit, onDeleteGroup }: HRG
           <div className="library-card-title" style={{ fontSize: '18px', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '8px', margin: '4px 0 6px 0' }}>
             {name}
             <span style={{ fontSize: '10px', fontWeight: '600', color: 'var(--color-blue)', backgroundColor: 'var(--color-blue-light)', padding: '2px 8px', borderRadius: '12px', border: '1px solid rgba(49, 130, 246, 0.15)' }}>
-              5대 레벨 통합
+              {items.length}대 레벨 통합
             </span>
           </div>
           <div className="library-card-formula" style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
@@ -93,31 +93,53 @@ export function HRGroupCard({ name, items, repItem, onEdit, onDeleteGroup }: HRG
           </div>
         </div>
 
-        {/* 5대 레벨 단가 가로 콤팩트 분할 배치 */}
+        {/* 3/4/5대 레벨 단가 동적 분할 배치 */}
         <div style={{ flex: '2', minWidth: '320px' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '8px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${items.length}, 1fr)`, gap: '8px' }}>
             {items.map((gi) => {
-              const shortRank = gi.rank ? gi.rank.replace(' Support', '').replace(' Operator', '').replace(' Specialist', '').replace(' Lead', '').replace(' Director', '') : '';
-              const isL2 = gi.rank === 'L2 Operator';
+              const shortRank = gi.rank 
+                ? gi.rank
+                    .replace(' Support', '')
+                    .replace(' Operator', '')
+                    .replace(' Specialist', '')
+                    .replace(' Lead', '')
+                    .replace(' Director', '')
+                    .replace(' 스태프', '')
+                    .replace(' PM', '')
+                    .replace(' 실무보조', '보조')
+                    .replace(' 기본실무', '실무')
+                    .replace(' 전문수행', '전문')
+                    .replace(' 파트리더', '리더')
+                    .replace(' 총괄리더', '리더')
+                : '';
+                
+              const isBase = gi.basePrice && gi.basePrice > 0 
+                ? gi.defaultPrice === gi.basePrice
+                : (gi.rank === 'L2 Operator' || gi.rank === '엔지니어' || gi.rank === '운영 스태프' || gi.rank === 'L2 기본실무');
+                
+              const calculatedMult = gi.basePrice && gi.basePrice > 0 
+                ? Math.round((gi.defaultPrice / gi.basePrice) * 10) / 10 
+                : 1.0;
+
               return (
                 <div 
                   key={gi.id} 
                   style={{ 
                     padding: '10px 6px', 
-                    backgroundColor: isL2 ? 'rgba(49, 130, 246, 0.05)' : 'var(--bg-secondary)', 
-                    border: isL2 ? '1.5px solid var(--color-blue)' : '1px solid var(--border-color)', 
+                    backgroundColor: isBase ? 'rgba(49, 130, 246, 0.05)' : 'var(--bg-secondary)', 
+                    border: isBase ? '1.5px solid var(--color-blue)' : '1px solid var(--border-color)', 
                     borderRadius: 'var(--radius-md)', 
                     textAlign: 'center',
-                    boxShadow: isL2 ? '0 2px 8px rgba(49, 130, 246, 0.08)' : 'none'
+                    boxShadow: isBase ? '0 2px 8px rgba(49, 130, 246, 0.08)' : 'none'
                   }}
                 >
-                  <div style={{ fontSize: '11px', fontWeight: '800', color: isL2 ? 'var(--color-blue)' : 'var(--text-primary)' }}>
+                  <div style={{ fontSize: '11px', fontWeight: '800', color: isBase ? 'var(--color-blue)' : 'var(--text-primary)' }}>
                     {shortRank}
                   </div>
                   <div style={{ fontSize: '9px', color: 'var(--text-tertiary)', margin: '2px 0' }}>
-                    {gi.rank === 'L1 Support' ? '0.8x' : gi.rank === 'L2 Operator' ? '1.0x (기준)' : gi.rank === 'L3 Specialist' ? '1.5x' : gi.rank === 'L4 Lead' ? '2.0x' : '3.0x'}
+                    {calculatedMult.toFixed(1)}x{isBase ? ' (기준)' : ''}
                   </div>
-                  <div style={{ fontSize: '13px', fontWeight: '800', color: isL2 ? 'var(--color-blue)' : 'var(--text-secondary)' }}>
+                  <div style={{ fontSize: '13px', fontWeight: '800', color: isBase ? 'var(--color-blue)' : 'var(--text-secondary)' }}>
                     ₩{(gi.defaultPrice / 10000).toLocaleString()}만
                   </div>
                 </div>

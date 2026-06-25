@@ -7,13 +7,15 @@ interface SettingsTabProps {
   setVendorInfo: React.Dispatch<React.SetStateAction<VendorInfo>>;
   onSave: (e: React.FormEvent) => void;
   onSealUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onLogoUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }
 
 export default function SettingsTab({
   vendorInfo,
   setVendorInfo,
   onSave,
-  onSealUpload
+  onSealUpload,
+  onLogoUpload
 }: SettingsTabProps) {
   return (
     <div className="workspace">
@@ -100,45 +102,88 @@ export default function SettingsTab({
           </button>
         </form>
 
-        <div className="card">
-          <div style={{ fontSize: '16px', fontWeight: '700', marginBottom: '16px' }}>회사 직인 (도장) 등록</div>
-          <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.6', marginBottom: '20px' }}>
-            A4로 발행되는 견적서 원장 공급자명 우측에 날인될 도장 이미지를 등록합니다. 투명 배경(PNG)에 붉은색 도장 이미지를 권장합니다.
-          </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', width: '100%' }}>
+          <div className="card">
+            <div style={{ fontSize: '16px', fontWeight: '700', marginBottom: '16px' }}>회사 직인 (도장) 등록</div>
+            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.6', marginBottom: '20px' }}>
+              A4로 발행되는 견적서 원장 공급자명 우측에 날인될 도장 이미지를 등록합니다. 투명 배경(PNG)에 붉은색 도장 이미지를 권장합니다.
+            </p>
 
-          <div 
-            style={{ 
-              border: '2px dashed var(--border-color)', 
-              borderRadius: 'var(--radius-lg)', 
-              height: '200px', 
-              display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: 'center',
-              backgroundColor: 'var(--bg-primary)',
-              marginBottom: '20px',
-              position: 'relative'
-            }}
-          >
-            {vendorInfo.sealImage ? (
-              <img 
-                src={vendorInfo.sealImage} 
-                alt="회사 직인 도장" 
-                style={{ height: '120px', width: '120px', objectFit: 'contain' }} 
+            <div 
+              style={{ 
+                border: '2px dashed var(--border-color)', 
+                borderRadius: 'var(--radius-lg)', 
+                height: '180px', 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center',
+                backgroundColor: 'var(--bg-primary)',
+                marginBottom: '20px',
+                position: 'relative'
+              }}
+            >
+              {vendorInfo.sealImage ? (
+                <img 
+                  src={vendorInfo.sealImage} 
+                  alt="회사 직인 도장" 
+                  style={{ height: '120px', width: '120px', objectFit: 'contain' }} 
+                />
+              ) : (
+                <span style={{ color: 'var(--text-tertiary)', fontSize: '13px' }}>등록된 도장 없음</span>
+              )}
+            </div>
+
+            <label className="btn btn-secondary" style={{ width: '100%', cursor: 'pointer' }}>
+              <Upload size={16} /> 도장 이미지 파일 선택 (.png, .jpg)
+              <input 
+                type="file" 
+                accept="image/*" 
+                onChange={onSealUpload} 
+                style={{ display: 'none' }} 
               />
-            ) : (
-              <span style={{ color: 'var(--text-tertiary)', fontSize: '13px' }}>등록된 도장 없음</span>
-            )}
+            </label>
           </div>
 
-          <label className="btn btn-secondary" style={{ width: '100%', cursor: 'pointer' }}>
-            <Upload size={16} /> 도장 이미지 파일 선택 (.png, .jpg)
-            <input 
-              type="file" 
-              accept="image/*" 
-              onChange={onSealUpload} 
-              style={{ display: 'none' }} 
-            />
-          </label>
+          <div className="card">
+            <div style={{ fontSize: '16px', fontWeight: '700', marginBottom: '16px' }}>회사 로고 등록</div>
+            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.6', marginBottom: '20px' }}>
+              A4로 발행되는 견적서 원장 좌측 상단에 표시될 로고 이미지를 등록합니다. 투명 배경(PNG)의 가로형 로고 이미지를 권장합니다.
+            </p>
+
+            <div 
+              style={{ 
+                border: '2px dashed var(--border-color)', 
+                borderRadius: 'var(--radius-lg)', 
+                height: '120px', 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center',
+                backgroundColor: 'var(--bg-primary)',
+                marginBottom: '20px',
+                position: 'relative'
+              }}
+            >
+              {vendorInfo.logoImage ? (
+                <img 
+                  src={vendorInfo.logoImage} 
+                  alt="회사 로고" 
+                  style={{ maxHeight: '80px', maxWidth: '240px', objectFit: 'contain' }} 
+                />
+              ) : (
+                <span style={{ color: 'var(--text-tertiary)', fontSize: '13px' }}>등록된 로고 없음</span>
+              )}
+            </div>
+
+            <label className="btn btn-secondary" style={{ width: '100%', cursor: 'pointer' }}>
+              <Upload size={16} /> 로고 이미지 파일 선택 (.png, .jpg)
+              <input 
+                type="file" 
+                accept="image/*" 
+                onChange={onLogoUpload} 
+                style={{ display: 'none' }} 
+              />
+            </label>
+          </div>
         </div>
 
       </div>

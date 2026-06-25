@@ -59,6 +59,8 @@ export interface EstimateRow {
   formulaType: FormulaType;
   vatType: VatType;
   description?: string;     // 비고/설명
+  correctionRate?: number;  // 행별 보정율 (예: 0.5)
+  correctionName?: string;  // 행별 보정 조건명 (예: '야간/주말 (+50%)')
 }
 
 // 견적서의 구분 단위 (섹션/그룹)
@@ -77,6 +79,38 @@ export interface VendorInfo {
   tel?: string;
   email?: string;
   sealImage?: string; // 직인 도장 이미지 (Base64 등)
+  logoImage?: string; // 회사 로고 이미지 (Base64 등)
+}
+
+// WBS 내의 세부 작업 (중분류 및 상세)
+export interface WbsTask {
+  id: string;
+  name: string;             // 작업내용 (예: "Claim Now 버튼 노출 정책 변경")
+  details: string[];        // 상세 세부 불릿 리스트 (예: ["불릿1", "불릿2"])
+  status: string;           // 완료일 / 진행상황
+  manpower: number;         // 투입인력 (명)
+  md: number;               // 투입일수 (MD)
+  role: string; // 연동할 역할군
+  roles?: string[]; // 다중 역할군 연동 지원
+}
+
+// WBS 대기능 / 항목 (대분류)
+export interface WbsCategory {
+  id: string;
+  no: number;               // No. (순서)
+  title: string;            // 항목/대분류명 (예: "벨기에/네덜란드 프로모션 오픈")
+  tasks: WbsTask[];         // 하위 세부 작업들
+}
+
+export interface ClientInfo {
+  id: string;
+  name: string;
+  bizNumber?: string;
+  ownerName?: string;
+  address?: string;
+  managerName?: string;
+  managerTel?: string;
+  memo?: string;
 }
 
 // 견적 프로젝트 전체 구조
@@ -84,12 +118,64 @@ export interface EstimateProject {
   id: string;
   projectType: 'IT' | 'DESIGN' | 'BUILD' | 'OTHER'; // 견적서 기본 폼 종류
   title: string;
+  clientId?: string;        // 고객사 ID 매핑 필드 추가
   clientName: string;
   estimateDate: string;
   expiryDate: string;
   vendorInfo: VendorInfo;
   sections: EstimateSection[];
   remarks: string;          // 비고란 내용
-  status: 'draft' | 'published';
+  status: 'draft' | 'invoicing' | 'completed'; // 작성중 | 청구중 | 지급완료
   createdAt: string;
+  wbs?: WbsCategory[];      // 프로젝트별 WBS 데이터
+  totalCorrectionRate?: number; // 총괄 보정율 (예: -0.10)
+  totalCorrectionName?: string; // 총괄 보정명 (예: '장기계약 할인 (-10%)')
+  useForeignCurrency?: boolean; // 외화 환산 표기 여부
+  foreignCurrency?: 'EUR' | 'USD' | 'JPY' | 'CNY'; // 표기 외화 종류 (EUR, USD, JPY, CNY 등)
+  exchangeRate?: number;        // 적용 환율 (1 외화 = OOO KRW)
+  exchangeRateSource?: 'manual' | 'api'; // 환율 입력 소스
 }
+
+export interface CorrectionFactor {
+  name: string;
+  rate: number; // 예: -0.10, +0.50
+  rangeText: string;
+}
+
+// 1. 행별 보정 프리셋 (긴급 투입, 야간/주말, 해외 커뮤니케이션, 고위험 책임, 단순 반복)
+export const ROW_CORRECTION_PRESETS: CorrectionFactor[] = [
+  { name: '보정 없음 (일반)', rate: 0.0, rangeText: '0%' },
+  { name: '긴급 투입 (+20%)', rate: 0.20, rangeText: '+20~50%' },
+  { name: '긴급 투입 (+30%)', rate: 0.30, rangeText: '+20~50%' },
+  { name: '긴급 투입 (+50%)', rate: 0.50, rangeText: '+20~50%' },
+  { name: '야간/주말 (+50%)', rate: 0.50, rangeText: '+50~100%' },
+  { name: '야간/주말 (+70%)', rate: 0.70, rangeText: '+50~100%' },
+  { name: '야간/주말 (+100%)', rate: 1.00, rangeText: '+50~100%' },
+  { name: '해외 커뮤니케이션 (+10%)', rate: 0.10, rangeText: '+10~20%' },
+  { name: '해외 커뮤니케이션 (+20%)', rate: 0.20, rangeText: '+10~20%' },
+  { name: '고위험 책임 업무 (+20%)', rate: 0.20, rangeText: '+20~30%' },
+  { name: '고위험 책임 업무 (+30%)', rate: 0.30, rangeText: '+20~30%' },
+  { name: '단순 반복 대량 작업 (-10%)', rate: -0.10, rangeText: '-10~20%' },
+  { name: '단순 반복 대량 작업 (-20%)', rate: -0.20, rangeText: '-10~20%' },
+];
+
+// 2. 전체 총괄 보정 프리셋 (장기계약 할인 및 야간/주말, 긴급투입 일괄 할증 등)
+export const TOTAL_CORRECTION_PRESETS: CorrectionFactor[] = [
+  { name: '총괄 보정 없음', rate: 0.0, rangeText: '0%' },
+  // 할인형 총괄 보정
+  { name: '장기계약 할인 (-5%)', rate: -0.05, rangeText: '-5~15%' },
+  { name: '장기계약 할인 (-10%)', rate: -0.10, rangeText: '-5~15%' },
+  { name: '장기계약 할인 (-15%)', rate: -0.15, rangeText: '-5~15%' },
+  { name: '단순 반복 작업 (-10%)', rate: -0.10, rangeText: '-10~20%' },
+  { name: '단순 반복 작업 (-20%)', rate: -0.20, rangeText: '-10~20%' },
+  // 할증형 총괄 보정 (일괄 적용)
+  { name: '긴급 투입 할증 (+20%)', rate: 0.20, rangeText: '+20~50%' },
+  { name: '긴급 투입 할증 (+30%)', rate: 0.30, rangeText: '+20~50%' },
+  { name: '긴급 투입 할증 (+50%)', rate: 0.50, rangeText: '+20~50%' },
+  { name: '야간/주말 할증 (+50%)', rate: 0.50, rangeText: '+50~100%' },
+  { name: '야간/주말 할증 (+100%)', rate: 1.00, rangeText: '+50~100%' },
+  { name: '해외 커뮤니케이션 (+10%)', rate: 0.10, rangeText: '+10~20%' },
+  { name: '해외 커뮤니케이션 (+20%)', rate: 0.20, rangeText: '+10~20%' },
+  { name: '고위험 책임 업무 (+20%)', rate: 0.20, rangeText: '+20~30%' },
+  { name: '고위험 책임 업무 (+30%)', rate: 0.30, rangeText: '+20~30%' },
+];

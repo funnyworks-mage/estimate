@@ -14,23 +14,97 @@ interface ItemFormModalProps {
   onUpdateSettings: (settings: { categories: string[]; units: string[]; namesList: Record<string, string[]> }) => void;
 }
 
-// 역할 및 책임 레벨별 추천 배수 정의
-const RANK_MULTIPLIERS: Record<string, number> = {
-  'L1 Support': 0.8,
-  'L2 Operator': 1.0,
-  'L3 Specialist': 1.5,
-  'L4 Lead': 2.0,
-  'L5 Director': 3.0
+interface RankOptionInfo {
+  name: string;
+  multiplier: number;
+  description: string;
+}
+
+interface RankPreset {
+  name: string;
+  steps: 3 | 4 | 5;
+  ranks: RankOptionInfo[];
+}
+
+// 역할 및 책임 동적 단계 프리셋 정의 (3단계 / 4단계 / 5단계)
+const RANK_PRESETS: Record<'3' | '4' | '5', RankPreset[]> = {
+  '3': [
+    {
+      name: 'IT / QA 프리셋',
+      steps: 3,
+      ranks: [
+        { name: '테스터', multiplier: 0.8, description: '단순 테스트 수행 및 단순 버그 리포팅' },
+        { name: '엔지니어', multiplier: 1.0, description: 'TC 설계, 정밀 검증 및 기술 실무 수행' },
+        { name: '리드', multiplier: 1.8, description: 'QA 전략 수립, 품질 리스크 매니지먼트 및 최종 승인' }
+      ]
+    },
+    {
+      name: '3단계 기본 실무 체계',
+      steps: 3,
+      ranks: [
+        { name: 'L1 실무보조', multiplier: 0.8, description: '단순 업무 보조 및 실행 수행' },
+        { name: 'L2 기본실무', multiplier: 1.0, description: '독립적인 일반 실무 완수' },
+        { name: 'L3 총괄리더', multiplier: 1.8, description: '파트 설계, 일정 조율 및 종합 검수' }
+      ]
+    }
+  ],
+  '4': [
+    {
+      name: '현장 스태프 프리셋',
+      steps: 4,
+      ranks: [
+        { name: '보조 스태프', multiplier: 0.8, description: '단순 현장 보조, 대기 및 단순 실행' },
+        { name: '운영 스태프', multiplier: 1.0, description: '안내, 부스 운영 및 지정 실무 독립 수행' },
+        { name: '슈퍼바이저', multiplier: 1.5, description: '스태프 교육, 현장 조율 및 실시간 상황 통제' },
+        { name: '행사 총괄 PM', multiplier: 2.0, description: '현장 총괄 최종 의사결정 및 대외 총 책임' }
+      ]
+    },
+    {
+      name: '4단계 기본 실무 체계',
+      steps: 4,
+      ranks: [
+        { name: 'L1 실무보조', multiplier: 0.8, description: '보조 업무 수행' },
+        { name: 'L2 기본실무', multiplier: 1.0, description: '독립 실무 수행' },
+        { name: 'L3 전문수행', multiplier: 1.5, description: '설계 및 품질 책임' },
+        { name: 'L4 파트리더', multiplier: 2.0, description: '파트 총괄 및 대외 커뮤니케이션' }
+      ]
+    }
+  ],
+  '5': [
+    {
+      name: '5단계 IT 개발/디자인 전문 체계 (기존)',
+      steps: 5,
+      ranks: [
+        { name: 'L1 Support', multiplier: 0.8, description: '단순 반복 업무 및 보조 수행 (자료 정리, 현장 보조 등)' },
+        { name: 'L2 Operator', multiplier: 1.0, description: '일반 실무 독립 수행 및 실행 (정해진 프로세스 처리)' },
+        { name: 'L3 Specialist', multiplier: 1.5, description: '특정 파트의 단독 전문 수행 가능 (고급 실무력 보유)' },
+        { name: 'L4 Lead', multiplier: 2.0, description: '파트 리딩, 일정/품질 검수 및 고객 협의 가능' },
+        { name: 'L5 Director', multiplier: 3.0, description: '프로젝트 총괄 설계, 핵심 의사결정 및 최종 검수' }
+      ]
+    }
+  ]
 };
 
-// 역할 및 책임 레벨 옵션 (L1 Support ~ L5 Director 체계)
+// 하위 호환성을 위해 단일 5단계 매핑 헬퍼도 보존
 const RANK_OPTIONS = [
   '해당 없음',
   'L1 Support',
   'L2 Operator',
   'L3 Specialist',
   'L4 Lead',
-  'L5 Director'
+  'L5 Director',
+  '테스터',
+  '엔지니어',
+  '리드',
+  '보조 스태프',
+  '운영 스태프',
+  '슈퍼바이저',
+  '행사 총괄 PM',
+  'L1 실무보조',
+  'L2 기본실무',
+  'L3 총괄리더',
+  'L3 전문수행',
+  'L4 파트리더'
 ];
 
 // 레거시 텍스트에서 등급을 파싱하여 새 레벨 체계로 변환하는 헬퍼 함수
@@ -81,20 +155,56 @@ export default function ItemFormModal({
   const [internalMemo, setInternalMemo] = useState(item?.internalMemo || '');
   const [isBulkRank, setIsBulkRank] = useState(false);
 
+  // 동적 단계수 및 프리셋 관리 상태 추가
+  const [selectedSteps, setSelectedSteps] = useState<'3' | '4' | '5'>('5');
+  const [selectedPresetIdx, setSelectedPresetIdx] = useState<number>(0);
+
   // 사용자의 수동 조작 여부 추적
   const [isNameDirty, setIsNameDirty] = useState(false);
   const [isInternalNameDirty, setIsInternalNameDirty] = useState(false);
 
-  // 초기 렌더링 시 등급 및 항목명 역파싱 바인딩
+  // 현재 활성화된 프리셋 정보 파생 계산
+  const activePreset = React.useMemo(() => {
+    return RANK_PRESETS[selectedSteps][selectedPresetIdx] || RANK_PRESETS[selectedSteps][0];
+  }, [selectedSteps, selectedPresetIdx]);
+
+  const activeRankOptions = React.useMemo(() => {
+    return ['해당 없음', ...activePreset.ranks.map(r => r.name)];
+  }, [activePreset]);
+
+  // 초기 렌더링 시 등급 및 항목명 역파싱 바인딩 (단계 및 프리셋 역추적 장착)
   useEffect(() => {
     if (item) {
-      const parsedRank = parseInitialRank(item.internalName || '', item.name);
+      const parsedRank = item.rank || parseInitialRank(item.internalName || '', item.name);
       setRank(parsedRank);
       setCategory(item.category);
       setNameSelect(item.name);
       setUnit(item.unit);
+      setDefaultPrice(item.defaultPrice);
+      setFormulaType(item.formulaType);
+      setVatType(item.vatType);
+      setDescription(item.description || '');
+      setInternalMemo(item.internalMemo || '');
       setIsNameDirty(true); // 기존 수정건은 수동 상태로 간주하여 자동완성이 덮어쓰지 않게 차단
       setIsInternalNameDirty(true);
+
+      // 등급명을 기반으로 단계수와 프리셋 역추적
+      if (parsedRank && parsedRank !== '해당 없음') {
+        let found = false;
+        for (const stepsKey of ['3', '4', '5'] as const) {
+          const presets = RANK_PRESETS[stepsKey];
+          for (let pIdx = 0; pIdx < presets.length; pIdx++) {
+            const hasRank = presets[pIdx].ranks.some(option => option.name === parsedRank);
+            if (hasRank) {
+              setSelectedSteps(stepsKey);
+              setSelectedPresetIdx(pIdx);
+              found = true;
+              break;
+            }
+          }
+          if (found) break;
+        }
+      }
     } else {
       // 신규 등록 시 첫 번째 표준 항목으로 초기 선택
       const initialCat = '인건비 기준 (용역 공수)';
@@ -103,8 +213,13 @@ export default function ItemFormModal({
       if (available.length > 0) {
         setNameSelect(available[0]);
       }
+      setDefaultPrice(0);
+      setFormulaType('PEOPLE_x_DAYS_x_PRICE');
+      setVatType('TAX');
+      setDescription('');
+      setInternalMemo('');
     }
-  }, [item, namesList]);
+  }, [item]);
 
   // --- [지능형 동기화 엔진] 카테고리 변경 시 매핑 및 항목명 자동 제안 ---
   const handleCategoryChange = (selectedCat: string) => {
@@ -165,19 +280,19 @@ export default function ItemFormModal({
     e.preventDefault();
     
     if (isHR && isBulkRank && !item) {
-      // 5대 레벨 일괄 생성 모드
-      const items: CostItem[] = Object.keys(RANK_MULTIPLIERS).map((r) => {
-        const mult = RANK_MULTIPLIERS[r];
-        const calculatedPrice = Math.round(defaultPrice * mult);
+      // 선택된 프리셋 레벨 기준 일괄 생성 모드
+      const items: CostItem[] = activePreset.ranks.map((r) => {
+        const mult = r.multiplier;
+        const calculatedPrice = Math.ceil((defaultPrice * mult) / 10000) * 10000;
         
         return {
-          id: `item-${Date.now()}-${r.toLowerCase().replace(/\s+/g, '-')}`,
+          id: `item-${Date.now()}-${r.name.toLowerCase().replace(/\s+/g, '-')}`,
           name: finalName,
-          internalName: `${finalName} (${r})`,
+          internalName: `${finalName} (${r.name})`,
           category,
           unit,
           defaultPrice: calculatedPrice,
-          rank: r,
+          rank: r.name,
           basePrice: defaultPrice,
           formulaType,
           vatType,
@@ -188,6 +303,9 @@ export default function ItemFormModal({
       onSave(items);
     } else {
       // 단일 등록 및 수정 모드
+      const selectedRankInfo = activePreset.ranks.find(r => r.name === rank);
+      const mult = selectedRankInfo ? selectedRankInfo.multiplier : 1.0;
+      
       const savedItem: CostItem = {
         id: item?.id || `item-${Date.now()}`,
         name: finalName,
@@ -197,7 +315,7 @@ export default function ItemFormModal({
         defaultPrice,
         rank: isHR && rank !== '해당 없음' ? rank : undefined,
         basePrice: isHR && rank !== '해당 없음'
-          ? (item?.basePrice || (rank === 'L2 Operator' ? defaultPrice : Math.round(defaultPrice / (RANK_MULTIPLIERS[rank] || 1.0))))
+          ? (item?.basePrice || (mult === 1.0 ? defaultPrice : Math.round(defaultPrice / mult)))
           : undefined,
         formulaType,
         vatType,
@@ -352,7 +470,7 @@ export default function ItemFormModal({
         }
       `}</style>
 
-      <form className="modal-container" onSubmit={handleSubmit} style={{ maxWidth: '620px' }}>
+      <form className="modal-container" onSubmit={handleSubmit} style={{ maxWidth: '760px', width: '90%' }}>
         <div className="modal-header">
           <h2 className="modal-title">{item ? '기준 단가 수정' : '새 기준 단가 등록'}</h2>
           <button type="button" className="btn-icon-only" onClick={onClose}><X size={18} /></button>
@@ -500,18 +618,67 @@ export default function ItemFormModal({
                           if (e.target.checked) {
                             setRank('해당 없음');
                           } else {
-                            setRank('L1 Support');
+                            setRank(activePreset.ranks[0]?.name || '해당 없음');
                           }
                         }}
                         style={{ accentColor: 'var(--color-blue)' }}
                       />
-                      5대 레벨 일괄 저장
+                      {selectedSteps}대 레벨 일괄 저장
                     </label>
                   )}
                 </div>
+
+                {/* 동적 3/4/5단계 체계 선택 세그먼트 및 프리셋 드롭다운 */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '12px', backgroundColor: 'var(--bg-secondary)', padding: '12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)' }}>레벨 체계 단계수</span>
+                    <div style={{ display: 'flex', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
+                      {(['3', '4', '5'] as const).map(stepOpt => (
+                        <button
+                          key={stepOpt}
+                          type="button"
+                          onClick={() => {
+                            setSelectedSteps(stepOpt);
+                            setSelectedPresetIdx(0);
+                            setRank('해당 없음');
+                          }}
+                          style={{
+                            padding: '4px 12px',
+                            fontSize: '11px',
+                            fontWeight: '700',
+                            border: 'none',
+                            cursor: 'pointer',
+                            backgroundColor: selectedSteps === stepOpt ? 'var(--color-blue)' : '#ffffff',
+                            color: selectedSteps === stepOpt ? '#ffffff' : 'var(--text-secondary)',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          {stepOpt}단계
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)' }}>R&R 명칭 프리셋</span>
+                    <select
+                      className="select-input"
+                      value={selectedPresetIdx}
+                      onChange={e => {
+                        setSelectedPresetIdx(Number(e.target.value));
+                        setRank('해당 없음');
+                      }}
+                      style={{ height: '30px', fontSize: '12px', padding: '0 8px', width: '220px', minWidth: 'auto' }}
+                    >
+                      {RANK_PRESETS[selectedSteps].map((preset, idx) => (
+                        <option key={preset.name} value={idx}>{preset.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
                 {isBulkRank ? (
                   <div style={{ padding: '10px 14px', backgroundColor: 'var(--color-blue-light)', color: 'var(--color-blue)', borderRadius: 'var(--radius-sm)', fontSize: '13px', fontWeight: '600', border: '1px solid rgba(49, 130, 246, 0.2)', height: '42px', display: 'flex', alignItems: 'center' }}>
-                    ✨ 5대 레벨 단가가 일괄 저장됩니다.
+                    ✨ {activePreset.name} 단가가 일괄 생성됩니다.
                   </div>
                 ) : (
                   <select 
@@ -520,16 +687,17 @@ export default function ItemFormModal({
                     onChange={e => setRank(e.target.value)}
                     style={{ borderColor: 'var(--color-blue)', height: '42px' }}
                   >
-                    {RANK_OPTIONS.map(r => <option key={r} value={r}>{r}</option>)}
+                    {activeRankOptions.map(r => <option key={r} value={r}>{r}</option>)}
                   </select>
                 )}
+
                 <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '8px', lineHeight: '1.5', backgroundColor: 'var(--bg-secondary)', padding: '10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)' }}>
-                  <div style={{ fontWeight: 'bold', marginBottom: '4px', color: 'var(--text-secondary)' }}>[역할 및 책임 범위 레벨 기준]</div>
-                  • <strong>L1 Support</strong> (보조 수행): 단순 반복 업무 및 보조 수행 (자료 정리, 현장 보조 등)<br />
-                  • <strong>L2 Operator</strong> (실무 실행): 일반 실무 독립 수행 및 실행 (정해진 프로세스 처리)<br />
-                  • <strong>L3 Specialist</strong> (전문 수행): 특정 파트의 단독 전문 수행 가능 (고급 실무력 보유)<br />
-                  • <strong>L4 Lead</strong> (파트 리딩): 파트 리딩, 일정/품질 검수 및 고객 협의 가능<br />
-                  • <strong>L5 Director</strong> (총괄 책임): 프로젝트 총괄 설계, 핵심 의사결정 및 최종 검수
+                  <div style={{ fontWeight: 'bold', marginBottom: '4px', color: 'var(--text-secondary)' }}>[{activePreset.name} 레벨 기준]</div>
+                  {activePreset.ranks.map(r => (
+                    <div key={r.name} style={{ marginBottom: '2px' }}>
+                      • <strong>{r.name}</strong> ({r.multiplier}x): {r.description}
+                    </div>
+                  ))}
                 </div>
               </div>
             ) : (
@@ -601,13 +769,13 @@ export default function ItemFormModal({
               <div style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--text-secondary)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                 📊 레벨별 자동 계산 단가 미리보기
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '8px', textAlign: 'center' }}>
-                {Object.keys(RANK_MULTIPLIERS).map((r) => {
-                  const mult = RANK_MULTIPLIERS[r];
-                  const calculated = Math.round(defaultPrice * mult);
+              <div style={{ display: 'grid', gridTemplateColumns: `repeat(${activePreset.ranks.length}, 1fr)`, gap: '8px', textAlign: 'center' }}>
+                {activePreset.ranks.map((r) => {
+                  const mult = r.multiplier;
+                  const calculated = Math.ceil((defaultPrice * mult) / 10000) * 10000;
                   return (
-                    <div key={r} style={{ backgroundColor: '#ffffff', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', padding: '8px 4px' }}>
-                      <div style={{ fontSize: '11px', fontWeight: '700', color: r === 'L5 Director' || r === 'L4 Lead' ? 'var(--color-blue)' : 'var(--text-primary)' }}>{r}</div>
+                    <div key={r.name} style={{ backgroundColor: '#ffffff', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', padding: '8px 4px' }}>
+                      <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--color-blue)' }}>{r.name}</div>
                       <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', margin: '2px 0' }}>{mult}x</div>
                       <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-secondary)' }}>₩{calculated.toLocaleString()}</div>
                     </div>

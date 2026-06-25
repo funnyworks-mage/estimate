@@ -1,4 +1,4 @@
-import type { CostItem, CostPackage, EstimateProject, VendorInfo, EstimateRow } from '../types/estimate';
+import type { CostItem, CostPackage, EstimateProject, VendorInfo, EstimateRow, ClientInfo } from '../types/estimate';
 import { supabase, isSupabaseConfigured } from './supabaseClient';
 
 // --- 초기 기본 데이터 (사내 표준 프리셋) ---
@@ -198,13 +198,46 @@ const DEFAULT_COST_PACKAGES: CostPackage[] = [
 ];
 
 const DEFAULT_VENDOR_INFO: VendorInfo = {
-  companyName: '주식회사 퍼니웍스',
+  companyName: '(주)퍼니웍스',
   bizNumber: '119-87-05203',
-  ownerName: '홍길동',
-  address: '서울시 마포구 신촌로 48, 5층',
+  ownerName: '박성훈',
+  address: '서울시 마포구 신촌로48',
   tel: '02-123-4567',
   email: 'contact@funnyworks.com'
 };
+
+const DEFAULT_CLIENTS: ClientInfo[] = [
+  {
+    id: 'client-1',
+    name: 'LG CNS',
+    bizNumber: '116-81-19345',
+    ownerName: '김영섭',
+    address: '서울특별시 강서구 마곡중앙8로 71',
+    managerName: '이동훈 책임',
+    managerTel: '010-1234-5678',
+    memo: 'SI 프로젝트 주 거래처'
+  },
+  {
+    id: 'client-2',
+    name: '삼성전자',
+    bizNumber: '124-81-00998',
+    ownerName: '한종희',
+    address: '경기도 수원시 영통구 삼성로 129',
+    managerName: '박민우 프로',
+    managerTel: '010-9876-5432',
+    memo: '반도체 사업부 프로모션 거래처'
+  },
+  {
+    id: 'client-3',
+    name: '네이버',
+    bizNumber: '220-81-62517',
+    ownerName: '최수연',
+    address: '경기도 성남시 분당구 불정로 6',
+    managerName: '최윤아 팀장',
+    managerTel: '010-5555-4444',
+    memo: 'UI/UX 디자인 및 콘텐츠 기획 거래처'
+  }
+];
 
 const DEFAULT_PROJECTS: EstimateProject[] = [
   {
@@ -309,6 +342,8 @@ export function calculateRowAmounts(row: Omit<EstimateRow, 'supplyPrice' | 'vat'
 } {
   let q = row.quantity || 0;
   const p = row.price || 0;
+  const rate = row.correctionRate || 0;
+  const correctedPrice = Math.round(p * (1 + rate));
 
   if (row.formulaType === 'PEOPLE_x_DAYS_x_PRICE') {
     const people = row.people || 0;
@@ -322,13 +357,13 @@ export function calculateRowAmounts(row: Omit<EstimateRow, 'supplyPrice' | 'vat'
     case 'MD_x_PRICE':
     case 'MONTHS_x_PRICE':
     case 'PEOPLE_x_DAYS_x_PRICE':
-      supplyPrice = q * p;
+      supplyPrice = q * correctedPrice;
       break;
     case 'FIXED':
-      supplyPrice = p;
+      supplyPrice = correctedPrice;
       break;
     default:
-      supplyPrice = q * p;
+      supplyPrice = q * correctedPrice;
   }
 
   let vat = 0;
@@ -353,12 +388,16 @@ const KEYS = {
   COST_ITEMS: 'estimate_cost_items',
   COST_PACKAGES: 'estimate_cost_packages',
   VENDOR_INFO: 'estimate_vendor_info',
-  SETTINGS: 'estimate_settings'
+  SETTINGS: 'estimate_settings',
+  CLIENTS: 'estimate_clients'
 };
 
 export const StorageAPI = {
   // --- Projects (견적 프로젝트) CRUD ---
   async getProjects(): Promise<EstimateProject[]> {
+    let projects: EstimateProject[] = [];
+    let loaded = false;
+
     if (isSupabaseConfigured) {
       try {
         const { data, error } = await supabase
@@ -366,20 +405,83 @@ export const StorageAPI = {
           .select('*')
           .order('created_at', { ascending: false });
         if (!error && data) {
-          localStorage.setItem(KEYS.PROJECTS, JSON.stringify(data));
-          return data as EstimateProject[];
+          projects = data as EstimateProject[];
+          loaded = true;
         }
-        console.error('[Supabase] getProjects error:', error);
       } catch (e) {
         console.error('[Supabase] getProjects network error:', e);
       }
     }
-    const data = localStorage.getItem(KEYS.PROJECTS);
-    if (!data) {
-      await this.saveProjects(DEFAULT_PROJECTS);
-      return DEFAULT_PROJECTS;
+    
+    if (!loaded) {
+      const data = localStorage.getItem(KEYS.PROJECTS);
+      if (!data) {
+        await this.saveProjects(DEFAULT_PROJECTS);
+        return DEFAULT_PROJECTS;
+      }
+      projects = JSON.parse(data);
     }
-    return JSON.parse(data);
+
+    // WBS 더미 데이터 자가 정화(Clean-up) 엔진
+    let needsSave = false;
+    const cleanedProjects = projects.map(proj => {
+      if (!proj.wbs || proj.wbs.length === 0) return proj;
+      
+      let projChanged = false;
+      const cleanWbs = proj.wbs.map(cat => {
+        let catChanged = false;
+        const cleanedTitle = cat.title === '새로운 대분류 항목' ? '' : cat.title;
+        if (cleanedTitle !== cat.title) catChanged = true;
+
+        const cleanedTasks = cat.tasks.map(task => {
+          let taskChanged = false;
+          const cleanedName = task.name === '새로운 세부 작업내용' ? '' : task.name;
+          if (cleanedName !== task.name) taskChanged = true;
+
+          const cleanedDetails = task.details.filter(detail => 
+            detail !== '상세 세부 내역을 줄바꿈으로 작성하세요'
+          );
+          if (cleanedDetails.length !== task.details.length) taskChanged = true;
+
+          if (taskChanged) {
+            return {
+              ...task,
+              name: cleanedName,
+              details: cleanedDetails
+            };
+          }
+          return task;
+        });
+
+        const anyTaskChanged = cleanedTasks.some((t, idx) => t !== cat.tasks[idx]);
+        if (catChanged || anyTaskChanged) {
+          projChanged = true;
+          return {
+            ...cat,
+            title: cleanedTitle,
+            tasks: cleanedTasks
+          };
+        }
+        return cat;
+      });
+
+      if (projChanged) {
+        needsSave = true;
+        return { ...proj, wbs: cleanWbs };
+      }
+      return proj;
+    });
+
+    if (needsSave) {
+      localStorage.setItem(KEYS.PROJECTS, JSON.stringify(cleanedProjects));
+      if (isSupabaseConfigured) {
+        supabase.from('estimate_projects').upsert(cleanedProjects).then(({ error }) => {
+          if (error) console.error('[Supabase] auto-clean upsert error:', error);
+        });
+      }
+    }
+
+    return cleanedProjects;
   },
 
   async saveProjects(projects: EstimateProject[]): Promise<void> {
@@ -437,6 +539,91 @@ export const StorageAPI = {
         if (error) console.error('[Supabase] deleteProject error:', error);
       } catch (e) {
         console.error('[Supabase] deleteProject network error:', e);
+      }
+    }
+  },
+
+  // --- Clients (고객사 주소록) CRUD ---
+  async getClients(): Promise<ClientInfo[]> {
+    let clients: ClientInfo[] = [];
+    let loaded = false;
+
+    if (isSupabaseConfigured) {
+      try {
+        const { data, error } = await supabase
+          .from('estimate_clients')
+          .select('*')
+          .order('name', { ascending: true });
+        if (!error && data) {
+          clients = data as ClientInfo[];
+          loaded = true;
+        }
+      } catch (e) {
+        console.error('[Supabase] getClients network error:', e);
+      }
+    }
+
+    if (!loaded) {
+      const data = localStorage.getItem(KEYS.CLIENTS);
+      if (!data) {
+        await this.saveClients(DEFAULT_CLIENTS);
+        return DEFAULT_CLIENTS;
+      }
+      clients = JSON.parse(data);
+    }
+    return clients;
+  },
+
+  async saveClients(clients: ClientInfo[]): Promise<void> {
+    localStorage.setItem(KEYS.CLIENTS, JSON.stringify(clients));
+    if (isSupabaseConfigured) {
+      try {
+        const { error } = await supabase
+          .from('estimate_clients')
+          .upsert(clients);
+        if (error) console.error('[Supabase] saveClients error:', error);
+      } catch (e) {
+        console.error('[Supabase] saveClients network error:', e);
+      }
+    }
+  },
+
+  async saveClient(client: ClientInfo): Promise<void> {
+    const clients = await this.getClients();
+    const idx = clients.findIndex(c => c.id === client.id);
+    if (idx > -1) {
+      clients[idx] = client;
+    } else {
+      clients.push(client);
+    }
+    localStorage.setItem(KEYS.CLIENTS, JSON.stringify(clients));
+
+    if (isSupabaseConfigured) {
+      try {
+        const { error } = await supabase
+          .from('estimate_clients')
+          .upsert(client);
+        if (error) console.error('[Supabase] saveClient error:', error);
+      } catch (e) {
+        console.error('[Supabase] saveClient network error:', e);
+      }
+    }
+  },
+
+  async deleteClient(id: string): Promise<void> {
+    const clients = await this.getClients();
+    const filtered = clients.filter(c => c.id !== id);
+    localStorage.setItem(KEYS.CLIENTS, JSON.stringify(filtered));
+
+    if (isSupabaseConfigured) {
+      try {
+        const { error } = await supabase
+          .from('estimate_clients')
+          .delete()
+          .eq('id', id);
+        if (error) console.error('[Supabase] deleteClient error:', error);
+      } catch (e) {
+        console.error('[Supabase] deleteClient network error:', e);
       }
     }
   },
@@ -585,17 +772,65 @@ export const StorageAPI = {
       return currentItem;
     });
 
-    if (needsUpdate || loadedFromSupabase) {
+    // --- [안전성 극대화] 중복 ID 제거 및 잃어버린 L2 Operator 자동 복구 엔진 ---
+    const uniqueMap = new Map<string, CostItem>();
+    migratedItems.forEach(item => {
+      if (!uniqueMap.has(item.id)) {
+        uniqueMap.set(item.id, item);
+      }
+    });
+    let deduplicatedItems = Array.from(uniqueMap.values());
+    const hadDuplicates = deduplicatedItems.length !== migratedItems.length;
+
+    // 인건비 그룹별 등급 현황 통계
+    const hrGroups: Record<string, { hasL2: boolean; noRankItem: CostItem | null; totalCount: number }> = {};
+    deduplicatedItems.forEach(item => {
+      if (item.category && item.category.includes('인건비')) {
+        const name = item.name;
+        if (!hrGroups[name]) {
+          hrGroups[name] = { hasL2: false, noRankItem: null, totalCount: 0 };
+        }
+        hrGroups[name].totalCount++;
+        if (item.rank === 'L2 Operator') {
+          hrGroups[name].hasL2 = true;
+        } else if (!item.rank || item.rank === '해당 없음') {
+          hrGroups[name].noRankItem = item;
+        }
+      }
+    });
+
+    // L2 Operator가 누락되었는데 등급 없는 항목이 있는 그룹 복구
+    let hasRecoveredL2 = false;
+    deduplicatedItems = deduplicatedItems.map(item => {
+      if (item.category && item.category.includes('인건비') && (!item.rank || item.rank === '해당 없음')) {
+        const groupInfo = hrGroups[item.name];
+        if (groupInfo && !groupInfo.hasL2 && groupInfo.totalCount > 1) {
+          hasRecoveredL2 = true;
+          return {
+            ...item,
+            rank: 'L2 Operator',
+            internalName: item.internalName && !item.internalName.includes('L2 Operator')
+              ? `${item.name} (L2 Operator)`
+              : item.internalName || `${item.name} (L2 Operator)`
+          };
+        }
+      }
+      return item;
+    });
+
+    const finalNeedsUpdate = needsUpdate || loadedFromSupabase || hadDuplicates || hasRecoveredL2;
+
+    if (finalNeedsUpdate) {
       // 로컬 스토리지 상시 갱신
-      localStorage.setItem(KEYS.COST_ITEMS, JSON.stringify(migratedItems));
+      localStorage.setItem(KEYS.COST_ITEMS, JSON.stringify(deduplicatedItems));
       
       // 마이그레이션 등으로 보정된 데이터를 Supabase에도 일괄 업서트
-      if (needsUpdate && isSupabaseConfigured) {
-        await this.saveCostItems(migratedItems);
+      if (isSupabaseConfigured) {
+        await this.saveCostItems(deduplicatedItems);
       }
     }
     
-    return migratedItems;
+    return deduplicatedItems;
   },
 
   async saveCostItems(items: CostItem[]): Promise<void> {
@@ -766,7 +1001,12 @@ export const StorageAPI = {
       await this.saveVendorInfo(DEFAULT_VENDOR_INFO);
       return DEFAULT_VENDOR_INFO;
     }
-    return JSON.parse(data);
+    const parsed = JSON.parse(data) as VendorInfo;
+    if (parsed.ownerName === '홍길동' || parsed.address?.includes('5층')) {
+      await this.saveVendorInfo(DEFAULT_VENDOR_INFO);
+      return DEFAULT_VENDOR_INFO;
+    }
+    return parsed;
   },
 
   async saveVendorInfo(info: VendorInfo): Promise<void> {
@@ -791,7 +1031,8 @@ export const StorageAPI = {
       projects: await this.getProjects(),
       costItems: await this.getCostItems(),
       costPackages: await this.getCostPackages(),
-      vendorInfo: await this.getVendorInfo()
+      vendorInfo: await this.getVendorInfo(),
+      clients: await this.getClients()
     };
     return JSON.stringify(payload, null, 2);
   },
@@ -803,6 +1044,7 @@ export const StorageAPI = {
       if (parsed.costItems) await this.saveCostItems(parsed.costItems);
       if (parsed.costPackages) await this.saveCostPackages(parsed.costPackages);
       if (parsed.vendorInfo) await this.saveVendorInfo(parsed.vendorInfo);
+      if (parsed.clients) await this.saveClients(parsed.clients);
       return true;
     } catch (e) {
       console.error(e);
