@@ -14,7 +14,7 @@ if (isPlaceholder) {
 }
 
 // 유효한 설정 상태인지 플래그 제공
-export const isSupabaseConfigured = !isPlaceholder && !!supabaseUrl && supabaseAnonKey.startsWith('eyJ');
+export const isSupabaseConfigured = !isPlaceholder && !!supabaseUrl && !!supabaseAnonKey;
 
 // Supabase 라이브러리가 초기화 시 빈 값이나 잘못된 형식에 에러를 내는 것을 방지하는 안전장치
 const safeUrl = supabaseUrl || 'https://placeholder.supabase.co';
