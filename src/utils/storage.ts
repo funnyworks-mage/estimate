@@ -61,18 +61,52 @@ const DEFAULT_COST_ITEMS: CostItem[] = [
     internalMemo: '서버 인프라 구축 포함'
   },
   {
-    id: 'item-staff',
-    name: '현장 운영 인력',
-    internalName: '현장 진행 스태프 (L2 Operator)',
+    id: 'item-staff-helper',
+    name: '현장 보조 스태프',
+    internalName: '현장 보조 스태프',
     category: '인건비 기준 (용역 공수)',
     unit: '일',
     defaultPrice: 100000,
-    rank: 'L2 Operator',
-    basePrice: 100000,
     formulaType: 'PEOPLE_x_DAYS_x_PRICE',
     vatType: 'TAX',
-    description: '행사 현장 안내 및 운영 지원 인력',
-    internalMemo: '식비 별도 제공 필요'
+    description: '단순 현장 보조, 등록 및 대기 업무',
+    internalMemo: '단순 현장 스태프 기준'
+  },
+  {
+    id: 'item-staff-operator',
+    name: '현장 운영 스태프',
+    internalName: '현장 운영 스태프',
+    category: '인건비 기준 (용역 공수)',
+    unit: '일',
+    defaultPrice: 130000,
+    formulaType: 'PEOPLE_x_DAYS_x_PRICE',
+    vatType: 'TAX',
+    description: '현장 안내, 부스 운영 및 실무 수행',
+    internalMemo: '숙련 현장 스태프 기준'
+  },
+  {
+    id: 'item-staff-supervisor',
+    name: '현장 슈퍼바이저',
+    internalName: '현장 슈퍼바이저',
+    category: '인건비 기준 (용역 공수)',
+    unit: '일',
+    defaultPrice: 250000,
+    formulaType: 'PEOPLE_x_DAYS_x_PRICE',
+    vatType: 'TAX',
+    description: '현장 인력 관리, 일정 및 품질 총괄 관리',
+    internalMemo: '현장 감독 및 리더 기준'
+  },
+  {
+    id: 'item-staff-pm',
+    name: '행사 운영 PM',
+    internalName: '행사 운영 PM',
+    category: '인건비 기준 (용역 공수)',
+    unit: 'MD',
+    defaultPrice: 500000,
+    formulaType: 'PEOPLE_x_DAYS_x_PRICE',
+    vatType: 'TAX',
+    description: '행사 총괄 기획 및 클라이언트 최종 커뮤니케이션',
+    internalMemo: '프로젝트 총괄 PM 기준'
   },
   {
     id: 'item-drink',
@@ -146,7 +180,7 @@ const DEFAULT_COST_PACKAGES: CostPackage[] = [
       { itemId: 'item-drink', defaultQuantity: 900 },
       { itemId: 'item-cupcake', defaultQuantity: 600 },
       { itemId: 'item-pm', defaultQuantity: 0, defaultPeople: 1, defaultDays: 3 }, // 인원 1명 * 3일 = 3MD 자동 유도
-      { itemId: 'item-staff', defaultQuantity: 0, defaultPeople: 15, defaultDays: 3 }
+      { itemId: 'item-staff-operator', defaultQuantity: 0, defaultPeople: 15, defaultDays: 3 }
     ]
   },
   {
@@ -793,7 +827,10 @@ export const StorageAPI = {
           '디자이너 투입',
           '프론트엔드 개발',
           '백엔드 개발',
-          '현장 운영 인력',
+          '현장 보조 스태프',
+          '현장 운영 스태프',
+          '현장 슈퍼바이저',
+          '행사 운영 PM',
           '시스템 엔지니어',
           'UI/UX 퍼블리셔'
         ],
