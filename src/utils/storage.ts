@@ -308,7 +308,8 @@ const KEYS = {
   PROJECTS: 'estimate_projects',
   COST_ITEMS: 'estimate_cost_items',
   COST_PACKAGES: 'estimate_cost_packages',
-  VENDOR_INFO: 'estimate_vendor_info'
+  VENDOR_INFO: 'estimate_vendor_info',
+  SETTINGS: 'estimate_settings'
 };
 
 export const StorageAPI = {
@@ -467,22 +468,68 @@ export const StorageAPI = {
         needsUpdate = true;
       }
 
+      // 새 레벨(L1 ~ L5) 마이그레이션 보정
+      if (currentItem.rank) {
+        let newRank = currentItem.rank;
+        let rankMigrated = false;
+
+        if (['Junior', 'Level 1', '보조'].includes(newRank)) {
+          newRank = 'L1 Support';
+          rankMigrated = true;
+        } else if (['Associate', 'Level 2', '실무'].includes(newRank)) {
+          newRank = 'L2 Operator';
+          rankMigrated = true;
+        } else if (['Professional', 'Level 3', '단독'].includes(newRank)) {
+          newRank = 'L3 Specialist';
+          rankMigrated = true;
+        } else if (['Senior', 'Level 4', '리드'].includes(newRank)) {
+          newRank = 'L4 Lead';
+          rankMigrated = true;
+        } else if (['Lead', 'Level 5', '총괄'].includes(newRank)) {
+          newRank = 'L5 Director';
+          rankMigrated = true;
+        }
+
+        if (rankMigrated) {
+          currentItem.rank = newRank;
+          needsUpdate = true;
+        }
+      }
+
       if (currentItem.internalName) {
         let nameWithRank = currentItem.internalName;
         let rankChanged = false;
 
+        // 1단계: 레거시 한글/영어 직급명을 새 영문 레벨 키워드로 통일 및 마이그레이션
         if (nameWithRank.includes('S등급') || nameWithRank.includes('특급') || nameWithRank.includes('Lead')) {
-          nameWithRank = nameWithRank.replace('S등급', 'Lead').replace('특급', 'Lead');
-          rankChanged = true;
-        } else if (nameWithRank.includes('A등급') || nameWithRank.includes('고급') || nameWithRank.includes('Senior')) {
-          nameWithRank = nameWithRank.replace('A등급', 'Senior').replace('고급', 'Senior');
-          rankChanged = true;
-        } else if (nameWithRank.includes('중급') || nameWithRank.includes('Professional')) {
-          nameWithRank = nameWithRank.replace('중급', 'Professional');
-          rankChanged = true;
-        } else if (nameWithRank.includes('초급') || nameWithRank.includes('Associate')) {
-          nameWithRank = nameWithRank.replace('초급', 'Associate');
-          rankChanged = true;
+          if (!nameWithRank.includes('L5 Director')) {
+            nameWithRank = nameWithRank.replace('S등급', 'L5 Director').replace('특급', 'L5 Director').replace('(Lead)', '(L5 Director)');
+            rankChanged = true;
+          }
+        }
+        if (nameWithRank.includes('A등급') || nameWithRank.includes('고급') || nameWithRank.includes('Senior')) {
+          if (!nameWithRank.includes('L4 Lead')) {
+            nameWithRank = nameWithRank.replace('A등급', 'L4 Lead').replace('고급', 'L4 Lead').replace('(Senior)', '(L4 Lead)');
+            rankChanged = true;
+          }
+        }
+        if (nameWithRank.includes('중급') || nameWithRank.includes('Professional')) {
+          if (!nameWithRank.includes('L3 Specialist')) {
+            nameWithRank = nameWithRank.replace('중급', 'L3 Specialist').replace('(Professional)', '(L3 Specialist)');
+            rankChanged = true;
+          }
+        }
+        if (nameWithRank.includes('초급') || nameWithRank.includes('Associate')) {
+          if (!nameWithRank.includes('L2 Operator')) {
+            nameWithRank = nameWithRank.replace('초급', 'L2 Operator').replace('(Associate)', '(L2 Operator)');
+            rankChanged = true;
+          }
+        }
+        if (nameWithRank.includes('Junior')) {
+          if (!nameWithRank.includes('L1 Support')) {
+            nameWithRank = nameWithRank.replace('(Junior)', '(L1 Support)');
+            rankChanged = true;
+          }
         }
 
         if (rankChanged) {
@@ -716,6 +763,137 @@ export const StorageAPI = {
     } catch (e) {
       console.error(e);
       return false;
+    }
+  },
+
+  // --- Settings (드롭다운 카테고리, 단위, 항목명 맵) CRUD ---
+  async getSettings(): Promise<{ categories: string[]; units: string[]; namesList: Record<string, string[]> }> {
+    const defaultSettings = {
+      categories: [
+        '인건비 기준 (용역 공수)',
+        '디자인 결과물 기준',
+        '개발 결과물 기준',
+        '생산 결과물 기준',
+        '기타 결과물 기준'
+      ],
+      units: ['MD', '일', '시간', 'EA', '개', '잔', '종', '페이지', '건', '식', '개월'],
+      namesList: {
+        '인건비 기준 (용역 공수)': [
+          'PM 기획 인력',
+          '디자이너 투입',
+          '프론트엔드 개발',
+          '백엔드 개발',
+          '현장 운영 인력',
+          '시스템 엔지니어',
+          'UI/UX 퍼블리셔'
+        ],
+        '디자인 결과물 기준': [
+          '디자인 시안',
+          'BI/BX 로고 디자인',
+          '브로슈어 제작',
+          '패키지 디자인',
+          '웹사이트 상세페이지'
+        ],
+        '개발 결과물 기준': [
+          '월 유지보수',
+          '시스템 구축',
+          '서버 인프라 세팅',
+          '데이터베이스 설계',
+          'API 연동 개발'
+        ],
+        '생산 결과물 기준': [
+          '인쇄물 제작',
+          '부스 자재 생산',
+          '아크릴 명판 제작',
+          '시공 자재 가공',
+          '현수막 출력'
+        ],
+        '기타 결과물 기준': [
+          '음료 제조',
+          '컵케이크 납품',
+          '번역',
+          '도서 구매',
+          '소모품 구입'
+        ]
+      }
+    };
+
+    if (isSupabaseConfigured) {
+      try {
+        const { data, error } = await supabase
+          .from('estimate_settings')
+          .select('*')
+          .eq('id', 'default_settings')
+          .single();
+        if (!error && data) {
+          const parsed = {
+            categories: Array.isArray(data.categories) ? data.categories : JSON.parse(data.categories),
+            units: Array.isArray(data.units) ? data.units : JSON.parse(data.units),
+            namesList: typeof data.names_list === 'object' ? data.names_list : JSON.parse(data.names_list)
+          };
+          localStorage.setItem(KEYS.SETTINGS, JSON.stringify(parsed));
+          return parsed;
+        }
+        
+        if (error && (error.code === 'PGRST116' || error.code === '42P01')) {
+          console.warn('[Supabase] estimate_settings 테이블이 존재하지 않거나 설정이 비어있습니다. 로컬 기본 설정을 이용하고 업서트를 시도합니다.');
+          if (error.code === 'PGRST116') {
+            await this.saveSettings(defaultSettings);
+          }
+        } else {
+          console.error('[Supabase] getSettings error:', error);
+        }
+      } catch (e) {
+        console.error('[Supabase] getSettings network error:', e);
+      }
+    }
+
+    const localData = localStorage.getItem(KEYS.SETTINGS);
+    if (!localData) {
+      const legacyCats = localStorage.getItem('estimate_notion_categories_v4');
+      const legacyUnits = localStorage.getItem('estimate_notion_units_v4');
+      const legacyNames = localStorage.getItem('estimate_notion_names_v4');
+      
+      const migrated = {
+        categories: legacyCats ? JSON.parse(legacyCats) : defaultSettings.categories,
+        units: legacyUnits ? JSON.parse(legacyUnits) : defaultSettings.units,
+        namesList: legacyNames ? JSON.parse(legacyNames) : defaultSettings.namesList
+      };
+
+      localStorage.setItem(KEYS.SETTINGS, JSON.stringify(migrated));
+      return migrated;
+    }
+    return JSON.parse(localData);
+  },
+
+  async saveSettings(settings: { categories: string[]; units: string[]; namesList: Record<string, string[]> }): Promise<void> {
+    localStorage.setItem(KEYS.SETTINGS, JSON.stringify(settings));
+    
+    localStorage.setItem('estimate_notion_categories_v4', JSON.stringify(settings.categories));
+    localStorage.setItem('estimate_notion_units_v4', JSON.stringify(settings.units));
+    localStorage.setItem('estimate_notion_names_v4', JSON.stringify(settings.namesList));
+
+    if (isSupabaseConfigured) {
+      try {
+        const { error } = await supabase
+          .from('estimate_settings')
+          .upsert({
+            id: 'default_settings',
+            categories: settings.categories,
+            units: settings.units,
+            names_list: settings.namesList,
+            updated_at: new Date().toISOString()
+          });
+        if (error) {
+          if (error.code === '42P01') {
+            console.warn('[Supabase] estimate_settings 테이블이 존재하지 않아 DB에 저장하지 못했습니다. 로컬스토리지 전용 모드로 원활히 구동됩니다.');
+          } else {
+            console.error('[Supabase] saveSettings error:', error);
+          }
+        }
+      } catch (e) {
+        console.error('[Supabase] saveSettings network error:', e);
+      }
     }
   }
 };

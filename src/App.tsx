@@ -61,6 +61,11 @@ export default function App() {
     address: ''
   });
 
+  // 드롭다운 설정 상태
+  const [categoriesList, setCategoriesList] = useState<string[]>([]);
+  const [unitsList, setUnitsList] = useState<string[]>([]);
+  const [namesList, setNamesList] = useState<Record<string, string[]>>({});
+
   // UI / 모달 상태
   const [isFormSelectModalOpen, setIsFormSelectModalOpen] = useState(false);
   const [isLibraryModalOpen, setIsLibraryModalOpen] = useState(false);
@@ -86,11 +91,15 @@ export default function App() {
         const items = await StorageAPI.getCostItems();
         const pkgs = await StorageAPI.getCostPackages();
         const vendor = await StorageAPI.getVendorInfo();
+        const settings = await StorageAPI.getSettings();
         
         setProjects(projs);
         setLibraryItems(items);
         setLibraryPackages(pkgs);
         setVendorInfo(vendor);
+        setCategoriesList(settings.categories);
+        setUnitsList(settings.units);
+        setNamesList(settings.namesList);
       } catch (e) {
         console.error('데이터 동기화 로딩 실패:', e);
       } finally {
@@ -616,6 +625,103 @@ export default function App() {
       setLibraryItems(updated);
       await StorageAPI.deleteCostItem(id);
     }
+  };
+
+  // --- 드롭다운 설정 CRUD 및 Cascade 전파 핸들러 ---
+  const handleUpdateSettings = async (updatedSettings: { categories: string[]; units: string[]; namesList: Record<string, string[]> }) => {
+    setCategoriesList(updatedSettings.categories);
+    setUnitsList(updatedSettings.units);
+    setNamesList(updatedSettings.namesList);
+    await StorageAPI.saveSettings(updatedSettings);
+  };
+
+  const handleCategoryRename = async (oldVal: string, newVal: string) => {
+    const trimmed = newVal.trim();
+    if (!trimmed || oldVal === trimmed) return;
+
+    // 1. 카테고리 목록 수정
+    const updatedCats = categoriesList.map(c => c === oldVal ? trimmed : c);
+    
+    // 2. namesList Key 이전 (Cascade)
+    const updatedNames = { ...namesList };
+    if (updatedNames[oldVal]) {
+      updatedNames[trimmed] = updatedNames[oldVal];
+      delete updatedNames[oldVal];
+    } else {
+      updatedNames[trimmed] = [];
+    }
+
+    setCategoriesList(updatedCats);
+    setNamesList(updatedNames);
+    await StorageAPI.saveSettings({
+      categories: updatedCats,
+      units: unitsList,
+      namesList: updatedNames
+    });
+
+    // 3. libraryItems 내 고유 카테고리 일괄 치환 (Cascade)
+    const updatedLibraryItems = libraryItems.map(item => {
+      if (item.category === oldVal) {
+        return { ...item, category: trimmed };
+      }
+      return item;
+    });
+    setLibraryItems(updatedLibraryItems);
+    await StorageAPI.saveCostItems(updatedLibraryItems);
+
+    // 4. 모든 projects 내 각 섹션 및 행의 카테고리 일괄 치환 (Cascade)
+    const updatedProjects = projects.map(proj => {
+      const updatedSections = proj.sections.map(sec => {
+        const updatedRows = sec.rows.map(row => {
+          if (row.category === oldVal) {
+            return { ...row, category: trimmed };
+          }
+          return row;
+        });
+        return { ...sec, rows: updatedRows };
+      });
+      return { ...proj, sections: updatedSections };
+    });
+    await updateProjectsState(updatedProjects);
+  };
+
+  const handleUnitRename = async (oldVal: string, newVal: string) => {
+    const trimmed = newVal.trim();
+    if (!trimmed || oldVal === trimmed) return;
+
+    // 1. 단위 목록 수정
+    const updatedUnits = unitsList.map(u => u === oldVal ? trimmed : u);
+    setUnitsList(updatedUnits);
+    await StorageAPI.saveSettings({
+      categories: categoriesList,
+      units: updatedUnits,
+      namesList
+    });
+
+    // 2. libraryItems 내 단위 일괄 치환 (Cascade)
+    const updatedLibraryItems = libraryItems.map(item => {
+      if (item.unit === oldVal) {
+        return { ...item, unit: trimmed };
+      }
+      return item;
+    });
+    setLibraryItems(updatedLibraryItems);
+    await StorageAPI.saveCostItems(updatedLibraryItems);
+
+    // 3. 모든 projects 내 각 행의 단위 일괄 치환 (Cascade)
+    const updatedProjects = projects.map(proj => {
+      const updatedSections = proj.sections.map(sec => {
+        const updatedRows = sec.rows.map(row => {
+          if (row.unit === oldVal) {
+            return { ...row, unit: trimmed };
+          }
+          return row;
+        });
+        return { ...sec, rows: updatedRows };
+      });
+      return { ...proj, sections: updatedSections };
+    });
+    await updateProjectsState(updatedProjects);
   };
 
   // --- 패키지 라이브러리 CRUD (Library Tab) ---
@@ -1606,8 +1712,14 @@ export default function App() {
       {isItemCreateModalOpen && (
         <ItemFormModal 
           item={editingItem}
+          categoriesList={categoriesList}
+          unitsList={unitsList}
+          namesList={namesList}
           onClose={() => setIsItemCreateModalOpen(false)}
           onSave={handleSaveCostItem}
+          onCategoryRename={handleCategoryRename}
+          onUnitRename={handleUnitRename}
+          onUpdateSettings={handleUpdateSettings}
         />
       )}
 

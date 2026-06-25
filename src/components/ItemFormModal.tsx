@@ -1,121 +1,73 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, ChevronDown, Plus } from 'lucide-react';
+import { X, ChevronDown, Plus, Edit2, Check } from 'lucide-react';
 import type { CostItem, FormulaType, VatType } from '../types/estimate';
 
 interface ItemFormModalProps {
   item: CostItem | null;
+  categoriesList: string[];
+  unitsList: string[];
+  namesList: Record<string, string[]>;
   onClose: () => void;
   onSave: (item: CostItem | CostItem[]) => void;
+  onCategoryRename: (oldVal: string, newVal: string) => void;
+  onUnitRename: (oldVal: string, newVal: string) => void;
+  onUpdateSettings: (settings: { categories: string[]; units: string[]; namesList: Record<string, string[]> }) => void;
 }
 
-// 등급별 추천 배수 정의
+// 역할 및 책임 레벨별 추천 배수 정의
 const RANK_MULTIPLIERS: Record<string, number> = {
-  'Junior': 1.0,
-  'Associate': 1.3,
-  'Professional': 1.7,
-  'Senior': 2.3,
-  'Lead': 3.0
+  'L1 Support': 1.0,
+  'L2 Operator': 1.3,
+  'L3 Specialist': 1.7,
+  'L4 Lead': 2.3,
+  'L5 Director': 3.0
 };
 
-// 카테고리별 기본 표준 권장 항목명 정의 (삭제 불가 상용구)
-const DEFAULT_POPULAR_NAMES: Record<string, string[]> = {
-  '인건비 기준 (용역 공수)': [
-    'PM 기획 인력',
-    '디자이너 투입',
-    '프론트엔드 개발',
-    '백엔드 개발',
-    '현장 운영 인력',
-    '시스템 엔지니어',
-    'UI/UX 퍼블리셔'
-  ],
-  '디자인 결과물 기준': [
-    '디자인 시안',
-    'BI/BX 로고 디자인',
-    '브로슈어 제작',
-    '패키지 디자인',
-    '웹사이트 상세페이지'
-  ],
-  '개발 결과물 기준': [
-    '월 유지보수',
-    '시스템 구축',
-    '서버 인프라 세팅',
-    '데이터베이스 설계',
-    'API 연동 개발'
-  ],
-  '생산 결과물 기준': [
-    '인쇄물 제작',
-    '부스 자재 생산',
-    '아크릴 명판 제작',
-    '시공 자재 가공',
-    '현수막 출력'
-  ],
-  '기타 결과물 기준': [
-    '음료 제조',
-    '컵케이크 납품',
-    '번역',
-    '도서 구매',
-    '소모품 구입'
-  ]
-};
-
-// 2. 사내 표준 인력 등급 옵션 (Junior ~ Lead 체계)
+// 역할 및 책임 레벨 옵션 (L1 Support ~ L5 Director 체계)
 const RANK_OPTIONS = [
   '해당 없음',
-  'Junior',
-  'Associate',
-  'Professional',
-  'Senior',
-  'Lead'
+  'L1 Support',
+  'L2 Operator',
+  'L3 Specialist',
+  'L4 Lead',
+  'L5 Director'
 ];
 
-// 레거시 텍스트에서 등급을 파싱하는 헬퍼 함수
+// 레거시 텍스트에서 등급을 파싱하여 새 레벨 체계로 변환하는 헬퍼 함수
 function parseInitialRank(internalName: string, name: string): string {
   const fullText = `${internalName || ''} ${name || ''}`.toLowerCase();
+  
+  // 새 레벨 명칭 매핑
   for (const rank of RANK_OPTIONS) {
     if (rank !== '해당 없음' && fullText.includes(rank.toLowerCase())) {
       return rank;
     }
   }
+  
+  // 레거시 명칭 폴백 파싱
+  if (fullText.includes('junior') || fullText.includes('보조') || fullText.includes('l1') || fullText.includes('support')) return 'L1 Support';
+  if (fullText.includes('associate') || fullText.includes('실무') || fullText.includes('l2') || fullText.includes('operator')) return 'L2 Operator';
+  if (fullText.includes('professional') || fullText.includes('단독') || fullText.includes('l3') || fullText.includes('specialist')) return 'L3 Specialist';
+  if (fullText.includes('senior') || fullText.includes('리드') || fullText.includes('l4') || fullText.includes('lead')) return 'L4 Lead';
+  if (fullText.includes('director') || fullText.includes('총괄') || fullText.includes('l5')) return 'L5 Director';
+  
   return '해당 없음';
 }
 
-export default function ItemFormModal({ item, onClose, onSave }: ItemFormModalProps) {
-  // --- [영구 재사용 저장소 로드] 사용자가 추가한 커스텀 카테고리, 항목명, 단위 상태 ---
-  // 1. 카테고리 단일 통합 리스트 (최초 로드 시 기본 카테고리 자동 이식)
-  const [categoriesList, setCategoriesList] = useState<string[]>(() => {
-    const data = localStorage.getItem('estimate_notion_categories_v4');
-    if (data) return JSON.parse(data);
-    const initial = [
-      '인건비 기준 (용역 공수)',
-      '디자인 결과물 기준',
-      '개발 결과물 기준',
-      '생산 결과물 기준',
-      '기타 결과물 기준'
-    ];
-    localStorage.setItem('estimate_notion_categories_v4', JSON.stringify(initial));
-    return initial;
-  });
-
-  // 2. 단위 단일 통합 리스트
-  const [unitsList, setUnitsList] = useState<string[]>(() => {
-    const data = localStorage.getItem('estimate_notion_units_v4');
-    if (data) return JSON.parse(data);
-    const initial = ['MD', '일', '시간', 'EA', '개', '잔', '종', '페이지', '건', '식', '개월'];
-    localStorage.setItem('estimate_notion_units_v4', JSON.stringify(initial));
-    return initial;
-  });
-
-  // 3. 표준 항목명 단일 통합 리스트
-  const [namesList, setNamesList] = useState<Record<string, string[]>>(() => {
-    const data = localStorage.getItem('estimate_notion_names_v4');
-    if (data) return JSON.parse(data);
-    localStorage.setItem('estimate_notion_names_v4', JSON.stringify(DEFAULT_POPULAR_NAMES));
-    return DEFAULT_POPULAR_NAMES;
-  });
-
+export default function ItemFormModal({
+  item,
+  categoriesList,
+  unitsList,
+  namesList,
+  onClose,
+  onSave,
+  onCategoryRename,
+  onUnitRename,
+  onUpdateSettings
+}: ItemFormModalProps) {
   // --- E. 입력 제어 상태 ---
   const [category, setCategory] = useState(item?.category || '인건비 기준 (용역 공수)');
-  const [nameSelect, setNameSelect] = useState(item?.name || 'PM 기획 인력');
+  const [nameSelect, setNameSelect] = useState(item?.name || '');
   const [rank, setRank] = useState('해당 없음');
   
   const [finalName, setFinalName] = useState(item?.name || '');
@@ -143,24 +95,16 @@ export default function ItemFormModal({ item, onClose, onSave }: ItemFormModalPr
       setUnit(item.unit);
       setIsNameDirty(true); // 기존 수정건은 수동 상태로 간주하여 자동완성이 덮어쓰지 않게 차단
       setIsInternalNameDirty(true);
+    } else {
+      // 신규 등록 시 첫 번째 표준 항목으로 초기 선택
+      const initialCat = '인건비 기준 (용역 공수)';
+      setCategory(initialCat);
+      const available = namesList[initialCat] || [];
+      if (available.length > 0) {
+        setNameSelect(available[0]);
+      }
     }
-  }, [item]);
-
-  // --- 로컬스토리지 싱크 유틸리티 ---
-  const saveCategoriesList = (newCats: string[]) => {
-    setCategoriesList(newCats);
-    localStorage.setItem('estimate_notion_categories_v4', JSON.stringify(newCats));
-  };
-
-  const saveNamesList = (newNames: Record<string, string[]>) => {
-    setNamesList(newNames);
-    localStorage.setItem('estimate_notion_names_v4', JSON.stringify(newNames));
-  };
-
-  const saveUnitsList = (newUnits: string[]) => {
-    setUnitsList(newUnits);
-    localStorage.setItem('estimate_notion_units_v4', JSON.stringify(newUnits));
-  };
+  }, [item, namesList]);
 
   // --- [지능형 동기화 엔진] 카테고리 변경 시 매핑 및 항목명 자동 제안 ---
   const handleCategoryChange = (selectedCat: string) => {
@@ -190,7 +134,6 @@ export default function ItemFormModal({ item, onClose, onSave }: ItemFormModalPr
 
     // 2단계: 카테고리에 할당된 첫 번째 표준 항목명으로 피딩
     const availableNames = namesList[selectedCat] || [];
-    
     if (availableNames.length > 0) {
       setNameSelect(availableNames[0]);
     } else {
@@ -222,13 +165,13 @@ export default function ItemFormModal({ item, onClose, onSave }: ItemFormModalPr
     e.preventDefault();
     
     if (isHR && isBulkRank && !item) {
-      // 5대 등급 일괄 생성 모드
+      // 5대 레벨 일괄 생성 모드
       const items: CostItem[] = Object.keys(RANK_MULTIPLIERS).map((r) => {
         const mult = RANK_MULTIPLIERS[r];
         const calculatedPrice = Math.round(defaultPrice * mult);
         
         return {
-          id: `item-${Date.now()}-${r.toLowerCase()}`,
+          id: `item-${Date.now()}-${r.toLowerCase().replace(/\s+/g, '-')}`,
           name: finalName,
           internalName: `${finalName} (${r})`,
           category,
@@ -254,7 +197,7 @@ export default function ItemFormModal({ item, onClose, onSave }: ItemFormModalPr
         defaultPrice,
         rank: isHR && rank !== '해당 없음' ? rank : undefined,
         basePrice: isHR && rank !== '해당 없음'
-          ? (item?.basePrice || (rank === 'Junior' ? defaultPrice : Math.round(defaultPrice / (RANK_MULTIPLIERS[rank] || 1.0))))
+          ? (item?.basePrice || (rank === 'L1 Support' ? defaultPrice : Math.round(defaultPrice / (RANK_MULTIPLIERS[rank] || 1.0))))
           : undefined,
         formulaType,
         vatType,
@@ -349,8 +292,21 @@ export default function ItemFormModal({ item, onClose, onSave }: ItemFormModalPr
           transition: all 0.15s;
         }
         .notion-dropdown-delete-btn:hover {
+          background-color: rgba(49, 130, 246, 0.1);
+          color: var(--color-blue);
+        }
+        .notion-dropdown-delete-btn.danger:hover {
           background-color: rgba(231, 76, 60, 0.1);
           color: var(--color-red);
+        }
+        .notion-dropdown-item-actions {
+          display: flex;
+          gap: 4px;
+          opacity: 0.4;
+          transition: opacity 0.15s;
+        }
+        .notion-dropdown-item:hover .notion-dropdown-item-actions {
+          opacity: 1;
         }
         .notion-dropdown-input-area {
           display: flex;
@@ -413,17 +369,28 @@ export default function ItemFormModal({ item, onClose, onSave }: ItemFormModalPr
                 onSelect={(val) => handleCategoryChange(val)}
                 onAddOption={(newVal) => {
                   if (!categoriesList.includes(newVal)) {
-                    const updated = [...categoriesList, newVal];
-                    saveCategoriesList(updated);
+                    const updatedCats = [...categoriesList, newVal];
+                    const updatedNames = { ...namesList, [newVal]: [] };
+                    onUpdateSettings({ categories: updatedCats, units: unitsList, namesList: updatedNames });
                   }
                   handleCategoryChange(newVal);
                 }}
                 onDeleteOption={(delVal) => {
-                  const filtered = categoriesList.filter(c => c !== delVal);
-                  saveCategoriesList(filtered);
+                  const filteredCats = categoriesList.filter(c => c !== delVal);
+                  const updatedNames = { ...namesList };
+                  delete updatedNames[delVal];
+                  onUpdateSettings({ categories: filteredCats, units: unitsList, namesList: updatedNames });
                   if (category === delVal) {
-                    const fallback = filtered.length > 0 ? filtered[0] : '';
+                    const fallback = filteredCats.length > 0 ? filteredCats[0] : '';
                     handleCategoryChange(fallback);
+                  }
+                }}
+                onEditOption={(oldVal, newVal) => {
+                  const trimmed = newVal.trim();
+                  if (!trimmed || oldVal === trimmed) return;
+                  onCategoryRename(oldVal, trimmed);
+                  if (category === oldVal) {
+                    setCategory(trimmed);
                   }
                 }}
                 placeholder="카테고리 선택 및 추가"
@@ -440,16 +407,24 @@ export default function ItemFormModal({ item, onClose, onSave }: ItemFormModalPr
                 onAddOption={(newVal) => {
                   if (!unitsList.includes(newVal)) {
                     const updated = [...unitsList, newVal];
-                    saveUnitsList(updated);
+                    onUpdateSettings({ categories: categoriesList, units: updated, namesList });
                   }
                   setUnit(newVal);
                 }}
                 onDeleteOption={(delVal) => {
                   const filtered = unitsList.filter(u => u !== delVal);
-                  saveUnitsList(filtered);
+                  onUpdateSettings({ categories: categoriesList, units: filtered, namesList });
                   if (unit === delVal) {
                     const fallback = filtered.length > 0 ? filtered[0] : '';
                     setUnit(fallback);
+                  }
+                }}
+                onEditOption={(oldVal, newVal) => {
+                  const trimmed = newVal.trim();
+                  if (!trimmed || oldVal === trimmed) return;
+                  onUnitRename(oldVal, trimmed);
+                  if (unit === oldVal) {
+                    setUnit(trimmed);
                   }
                 }}
                 placeholder="단위 선택 및 추가"
@@ -470,11 +445,11 @@ export default function ItemFormModal({ item, onClose, onSave }: ItemFormModalPr
                 onAddOption={(newVal) => {
                   const currentNames = namesList[category] || [];
                   if (!currentNames.includes(newVal)) {
-                    const updated = {
+                    const updatedNames = {
                       ...namesList,
                       [category]: [...currentNames, newVal]
                     };
-                    saveNamesList(updated);
+                    onUpdateSettings({ categories: categoriesList, units: unitsList, namesList: updatedNames });
                   }
                   setNameSelect(newVal);
                   setIsNameDirty(false);
@@ -482,14 +457,28 @@ export default function ItemFormModal({ item, onClose, onSave }: ItemFormModalPr
                 onDeleteOption={(delVal) => {
                   const currentNames = namesList[category] || [];
                   const filtered = currentNames.filter(n => n !== delVal);
-                  const updated = {
+                  const updatedNames = {
                     ...namesList,
                     [category]: filtered
                   };
-                  saveNamesList(updated);
+                  onUpdateSettings({ categories: categoriesList, units: unitsList, namesList: updatedNames });
                   if (nameSelect === delVal) {
                     const fallback = filtered.length > 0 ? filtered[0] : '';
                     setNameSelect(fallback);
+                  }
+                }}
+                onEditOption={(oldVal, newVal) => {
+                  const trimmed = newVal.trim();
+                  if (!trimmed || oldVal === trimmed) return;
+                  const currentNames = namesList[category] || [];
+                  const updatedNamesArray = currentNames.map(n => n === oldVal ? trimmed : n);
+                  const updatedNames = {
+                    ...namesList,
+                    [category]: updatedNamesArray
+                  };
+                  onUpdateSettings({ categories: categoriesList, units: unitsList, namesList: updatedNames });
+                  if (nameSelect === oldVal) {
+                    setNameSelect(trimmed);
                   }
                 }}
                 placeholder="표준 항목 선택 및 추가"
@@ -500,7 +489,7 @@ export default function ItemFormModal({ item, onClose, onSave }: ItemFormModalPr
             {isHR ? (
               <div className="form-group">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                  <label className="form-label" style={{ fontWeight: '700', color: 'var(--color-blue)', margin: 0 }}>3단계. 인력 등급 선택</label>
+                  <label className="form-label" style={{ fontWeight: '700', color: 'var(--color-blue)', margin: 0 }}>3단계. 역할 및 책임 레벨 선택</label>
                   {!item && (
                     <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--color-blue)', cursor: 'pointer', fontWeight: '600' }}>
                       <input 
@@ -511,18 +500,18 @@ export default function ItemFormModal({ item, onClose, onSave }: ItemFormModalPr
                           if (e.target.checked) {
                             setRank('해당 없음');
                           } else {
-                            setRank('Junior');
+                            setRank('L1 Support');
                           }
                         }}
                         style={{ accentColor: 'var(--color-blue)' }}
                       />
-                      5대 등급 일괄 저장
+                      5대 레벨 일괄 저장
                     </label>
                   )}
                 </div>
                 {isBulkRank ? (
                   <div style={{ padding: '10px 14px', backgroundColor: 'var(--color-blue-light)', color: 'var(--color-blue)', borderRadius: 'var(--radius-sm)', fontSize: '13px', fontWeight: '600', border: '1px solid rgba(49, 130, 246, 0.2)', height: '42px', display: 'flex', alignItems: 'center' }}>
-                    ✨ 5대 등급 단가가 일괄 저장됩니다.
+                    ✨ 5대 레벨 단가가 일괄 저장됩니다.
                   </div>
                 ) : (
                   <select 
@@ -535,19 +524,19 @@ export default function ItemFormModal({ item, onClose, onSave }: ItemFormModalPr
                   </select>
                 )}
                 <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '8px', lineHeight: '1.5', backgroundColor: 'var(--bg-secondary)', padding: '10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)' }}>
-                  <div style={{ fontWeight: 'bold', marginBottom: '4px', color: 'var(--text-secondary)' }}>[사내 인력 등급 경력 기준]</div>
-                  • <strong>Junior</strong> (1년 미만): 보조 수행, 반복 업무 중심<br />
-                  • <strong>Associate</strong> (1~3년): 실무 수행 가능<br />
-                  • <strong>Professional</strong> (3~5년): 단독 업무 수행 가능<br />
-                  • <strong>Senior</strong> (5~8년): 주요 파트 리딩 가능<br />
-                  • <strong>Lead</strong> (8년 이상): 프로젝트 설계/검수/의사결정 가능
+                  <div style={{ fontWeight: 'bold', marginBottom: '4px', color: 'var(--text-secondary)' }}>[역할 및 책임 범위 레벨 기준]</div>
+                  • <strong>L1 Support</strong> (보조 수행): 단순 반복 업무 및 보조 수행 (자료 정리, 현장 보조 등)<br />
+                  • <strong>L2 Operator</strong> (실무 실행): 일반 실무 독립 수행 및 실행 (정해진 프로세스 처리)<br />
+                  • <strong>L3 Specialist</strong> (전문 수행): 특정 파트의 단독 전문 수행 가능 (고급 실무력 보유)<br />
+                  • <strong>L4 Lead</strong> (파트 리딩): 파트 리딩, 일정/품질 검수 및 고객 협의 가능<br />
+                  • <strong>L5 Director</strong> (총괄 책임): 프로젝트 총괄 설계, 핵심 의사결정 및 최종 검수
                 </div>
               </div>
             ) : (
               <div className="form-group" style={{ opacity: 0.4, cursor: 'not-allowed' }}>
-                <label className="form-label">3단계. 인력 등급 선택</label>
+                <label className="form-label">3단계. 역할 및 책임 레벨 선택</label>
                 <select className="select-input" disabled value="해당 없음" style={{ height: '42px' }}>
-                  <option value="해당 없음">등급 해당 없음 (결과물형)</option>
+                  <option value="해당 없음">레벨 해당 없음 (결과물형)</option>
                 </select>
               </div>
             )}
@@ -586,7 +575,7 @@ export default function ItemFormModal({ item, onClose, onSave }: ItemFormModalPr
           <div className="grid-2" style={{ borderTop: '1px dashed var(--border-color)', paddingTop: '16px' }}>
             <div className="form-group">
               <label className="form-label">
-                {isHR && isBulkRank ? 'Junior 기준 단가 (1.0x, 원)' : '기준 단가 (원)'}
+                {isHR && isBulkRank ? 'L1 Support 기준 단가 (1.0x, 원)' : '기준 단가 (원)'}
               </label>
               <input 
                 type="number" 
@@ -610,7 +599,7 @@ export default function ItemFormModal({ item, onClose, onSave }: ItemFormModalPr
           {isHR && isBulkRank && defaultPrice > 0 && (
             <div style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', padding: '12px 16px', backgroundColor: 'var(--bg-secondary)', marginTop: '4px', marginBottom: '12px' }}>
               <div style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--text-secondary)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                📊 등급별 자동 계산 단가 미리보기
+                📊 레벨별 자동 계산 단가 미리보기
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '8px', textAlign: 'center' }}>
                 {Object.keys(RANK_MULTIPLIERS).map((r) => {
@@ -618,7 +607,7 @@ export default function ItemFormModal({ item, onClose, onSave }: ItemFormModalPr
                   const calculated = Math.round(defaultPrice * mult);
                   return (
                     <div key={r} style={{ backgroundColor: '#ffffff', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', padding: '8px 4px' }}>
-                      <div style={{ fontSize: '11px', fontWeight: '700', color: r === 'Lead' || r === 'Senior' ? 'var(--color-blue)' : 'var(--text-primary)' }}>{r}</div>
+                      <div style={{ fontSize: '11px', fontWeight: '700', color: r === 'L5 Director' || r === 'L4 Lead' ? 'var(--color-blue)' : 'var(--text-primary)' }}>{r}</div>
                       <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', margin: '2px 0' }}>{mult}x</div>
                       <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-secondary)' }}>₩{calculated.toLocaleString()}</div>
                     </div>
@@ -678,6 +667,7 @@ interface NotionDropdownProps {
   onSelect: (val: string) => void;
   onAddOption: (val: string) => void;
   onDeleteOption: (val: string) => void;
+  onEditOption: (oldVal: string, newVal: string) => void; // 인라인 수정 핸들러
   placeholder?: string;
 }
 
@@ -687,10 +677,13 @@ function NotionDropdown({
   onSelect,
   onAddOption,
   onDeleteOption,
+  onEditOption,
   placeholder
 }: NotionDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [inputText, setInputText] = useState('');
+  const [editingValue, setEditingValue] = useState<string | null>(null);
+  const [editText, setEditText] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
 
   // 드롭다운 바깥 클릭 시 닫히도록 바인딩
@@ -698,6 +691,7 @@ function NotionDropdown({
     function handleClickOutside(event: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
         setIsOpen(false);
+        setEditingValue(null);
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
@@ -722,12 +716,20 @@ function NotionDropdown({
     }
   };
 
+  const handleSaveEdit = (oldOpt: string) => {
+    const trimmed = editText.trim();
+    if (trimmed && trimmed !== oldOpt) {
+      onEditOption(oldOpt, trimmed);
+    }
+    setEditingValue(null);
+  };
+
   return (
     <div className="notion-dropdown-container" ref={containerRef}>
       {/* 트리거 버튼 */}
       <div 
         className="notion-dropdown-trigger" 
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => { setIsOpen(!isOpen); setEditingValue(null); }}
         tabIndex={0}
       >
         <span style={{ color: value ? 'var(--text-primary)' : 'var(--text-tertiary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -740,27 +742,89 @@ function NotionDropdown({
       {isOpen && (
         <div className="notion-dropdown-popover">
           
-          {/* 단일 루프: 모든 항목 끝에 X 삭제 단추가 표시됨 */}
-          {options.map((opt) => (
-            <div 
-              key={opt}
-              className={`notion-dropdown-item ${value === opt ? 'active' : ''}`}
-              onClick={() => { onSelect(opt); setIsOpen(false); }}
-            >
-              <span>{opt}</span>
-              <button 
-                type="button"
-                className="notion-dropdown-delete-btn"
-                onClick={(e) => {
-                  e.stopPropagation(); // 아이템 선택 이벤트 전파 차단
-                  onDeleteOption(opt);
-                }}
-                title="선택지 삭제"
+          {/* 단일 루프 */}
+          {options.map((opt) => {
+            const isEditing = opt === editingValue;
+            
+            if (isEditing) {
+              return (
+                <div 
+                  key={opt}
+                  className="notion-dropdown-item"
+                  onClick={(e) => e.stopPropagation()} // 팝오버 닫힘 방지
+                  style={{ backgroundColor: 'var(--bg-secondary)', gap: '6px' }}
+                >
+                  <input 
+                    type="text"
+                    className="notion-dropdown-input"
+                    value={editText}
+                    onChange={(e) => setEditText(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleSaveEdit(opt);
+                      } else if (e.key === 'Escape') {
+                        setEditingValue(null);
+                      }
+                    }}
+                    autoFocus
+                    style={{ flex: 1, padding: '4px 8px', fontSize: '12px' }}
+                  />
+                  <button 
+                    type="button"
+                    className="notion-dropdown-delete-btn"
+                    onClick={() => handleSaveEdit(opt)}
+                    style={{ height: '24px', width: '24px' }}
+                    title="저장"
+                  >
+                    <Check size={12} />
+                  </button>
+                  <button 
+                    type="button"
+                    className="notion-dropdown-delete-btn danger"
+                    onClick={() => setEditingValue(null)}
+                    style={{ height: '24px', width: '24px' }}
+                    title="취소"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              );
+            }
+
+            return (
+              <div 
+                key={opt}
+                className={`notion-dropdown-item ${value === opt ? 'active' : ''}`}
+                onClick={() => { onSelect(opt); setIsOpen(false); }}
               >
-                <X size={13} />
-              </button>
-            </div>
-          ))}
+                <span>{opt}</span>
+                <div className="notion-dropdown-item-actions" onClick={(e) => e.stopPropagation()}>
+                  <button 
+                    type="button"
+                    className="notion-dropdown-delete-btn"
+                    onClick={() => {
+                      setEditingValue(opt);
+                      setEditText(opt);
+                    }}
+                    title="선택지 수정"
+                    style={{ height: '24px', width: '24px' }}
+                  >
+                    <Edit2 size={12} />
+                  </button>
+                  <button 
+                    type="button"
+                    className="notion-dropdown-delete-btn danger"
+                    onClick={() => onDeleteOption(opt)}
+                    title="선택지 삭제"
+                    style={{ height: '24px', width: '24px' }}
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
 
           {options.length === 0 && (
             <div style={{ padding: '8px 14px', fontSize: '12px', color: 'var(--text-tertiary)', textAlign: 'center' }}>
