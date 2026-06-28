@@ -1,6 +1,69 @@
 import type { CostItem, CostPackage, EstimateProject, VendorInfo, EstimateRow, ClientInfo, DailyReport } from '../types/estimate';
 import { supabase, isSupabaseConfigured } from './supabaseClient';
 
+// --- 역사적 프로젝트 기반 라이브러리 단가 자가복구(Self-Healing) 엔진 ---
+export function healCostItemsFromProjects(items: CostItem[]): CostItem[] {
+  try {
+    const projectsData = localStorage.getItem('estimate_projects');
+    if (!projectsData) return items;
+    
+    const projects = JSON.parse(projectsData) as any[];
+    if (!Array.isArray(projects) || projects.length === 0) return items;
+    
+    // 프로젝트들을 createdAt 역순(가장 최근 작성분 우선) 정렬
+    const sortedProjects = [...projects].sort((a, b) => {
+      const da = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const db = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return db - da;
+    });
+
+    const priceMap = new Map<string, number>();
+    sortedProjects.forEach(proj => {
+      if (proj.sections && Array.isArray(proj.sections)) {
+        proj.sections.forEach((sec: any) => {
+          if (sec.rows && Array.isArray(sec.rows)) {
+            sec.rows.forEach((row: any) => {
+              if (row.name && row.price) {
+                // 등급명이나 ID를 기준으로 단가 파싱
+                const key = `${row.name.trim()}::${(row.rank || '').trim()}`;
+                if (!priceMap.has(key)) {
+                  priceMap.set(key, row.price);
+                }
+              }
+            });
+          }
+        });
+      }
+    });
+
+    if (priceMap.size === 0) return items;
+
+    let modified = false;
+    const healed = items.map(item => {
+      const key = `${item.name.trim()}::${(item.rank || '').trim()}`;
+      if (priceMap.has(key)) {
+        const historicalPrice = priceMap.get(key)!;
+        if (item.defaultPrice !== historicalPrice) {
+          modified = true;
+          return {
+            ...item,
+            defaultPrice: historicalPrice
+          };
+        }
+      }
+      return item;
+    });
+
+    if (modified) {
+      console.log('[AutoRestore] Successfully restored cost items from historical projects data!');
+    }
+    return healed;
+  } catch (e) {
+    console.warn('[AutoRestore] Failed to scan historical projects:', e);
+    return items;
+  }
+}
+
 // Supabase 세션 로그인 여부 동적 검사 헬퍼
 // (주요 데이터는 DB RLS 차단 에러 방지를 위해 로컬 스토리지 우선 보존 모드로 작동하도록 false 처리합니다.
 //  이를 통해 콘솔의 403 네트워크 소음을 100% 정화합니다.)
@@ -162,9 +225,9 @@ export const DEFAULT_COST_ITEMS: CostItem[] = [
     internalName: '프론트엔드 개발 (L1 Support)',
     category: '인건비 기준 (용역 공수)',
     unit: 'MD',
-    defaultPrice: 320000,
+    defaultPrice: 480000,
     rank: 'L1 Support',
-    basePrice: 400000,
+    basePrice: 600000,
     formulaType: 'PEOPLE_x_DAYS_x_PRICE',
     vatType: 'TAX',
     description: '단순 화면 마크업 및 스타일 오류 수정',
@@ -176,9 +239,9 @@ export const DEFAULT_COST_ITEMS: CostItem[] = [
     internalName: '프론트엔드 개발 (L2 Operator)',
     category: '인건비 기준 (용역 공수)',
     unit: 'MD',
-    defaultPrice: 400000,
+    defaultPrice: 600000,
     rank: 'L2 Operator',
-    basePrice: 400000,
+    basePrice: 600000,
     formulaType: 'PEOPLE_x_DAYS_x_PRICE',
     vatType: 'TAX',
     description: '일반 페이지 퍼블리싱 및 컴포넌트 개발',
@@ -190,9 +253,9 @@ export const DEFAULT_COST_ITEMS: CostItem[] = [
     internalName: '프론트엔드 개발 (L3 Specialist)',
     category: '인건비 기준 (용역 공수)',
     unit: 'MD',
-    defaultPrice: 600000,
+    defaultPrice: 900000,
     rank: 'L3 Specialist',
-    basePrice: 400000,
+    basePrice: 600000,
     formulaType: 'PEOPLE_x_DAYS_x_PRICE',
     vatType: 'TAX',
     description: '상태 관리 및 복잡한 비즈니스 로직 API 연동',
@@ -204,9 +267,9 @@ export const DEFAULT_COST_ITEMS: CostItem[] = [
     internalName: '프론트엔드 개발 (L4 Lead)',
     category: '인건비 기준 (용역 공수)',
     unit: 'MD',
-    defaultPrice: 800000,
+    defaultPrice: 1200000,
     rank: 'L4 Lead',
-    basePrice: 400000,
+    basePrice: 600000,
     formulaType: 'PEOPLE_x_DAYS_x_PRICE',
     vatType: 'TAX',
     description: '프론트 아키텍처 설계 및 PL 개발 리드',
@@ -218,9 +281,9 @@ export const DEFAULT_COST_ITEMS: CostItem[] = [
     internalName: '프론트엔드 개발 (L5 Director)',
     category: '인건비 기준 (용역 공수)',
     unit: 'MD',
-    defaultPrice: 1200000,
+    defaultPrice: 1800000,
     rank: 'L5 Director',
-    basePrice: 400000,
+    basePrice: 600000,
     formulaType: 'PEOPLE_x_DAYS_x_PRICE',
     vatType: 'TAX',
     description: '웹/앱 클라이언트 개발 총괄 디렉터',
@@ -234,9 +297,9 @@ export const DEFAULT_COST_ITEMS: CostItem[] = [
     internalName: '백엔드 개발 (L1 Support)',
     category: '인건비 기준 (용역 공수)',
     unit: 'MD',
-    defaultPrice: 400000,
+    defaultPrice: 560000,
     rank: 'L1 Support',
-    basePrice: 500000,
+    basePrice: 700000,
     formulaType: 'PEOPLE_x_DAYS_x_PRICE',
     vatType: 'TAX',
     description: '데이터 검증 로직 구현 및 쿼리 보조',
@@ -248,9 +311,9 @@ export const DEFAULT_COST_ITEMS: CostItem[] = [
     internalName: '백엔드 개발 (L2 Operator)',
     category: '인건비 기준 (용역 공수)',
     unit: 'MD',
-    defaultPrice: 500000,
+    defaultPrice: 700000,
     rank: 'L2 Operator',
-    basePrice: 500000,
+    basePrice: 700000,
     formulaType: 'PEOPLE_x_DAYS_x_PRICE',
     vatType: 'TAX',
     description: '단순 API 엔드포인트 구현 및 테스트',
@@ -262,9 +325,9 @@ export const DEFAULT_COST_ITEMS: CostItem[] = [
     internalName: '백엔드 개발 (L3 Specialist)',
     category: '인건비 기준 (용역 공수)',
     unit: 'MD',
-    defaultPrice: 750000,
+    defaultPrice: 1050000,
     rank: 'L3 Specialist',
-    basePrice: 500000,
+    basePrice: 700000,
     formulaType: 'PEOPLE_x_DAYS_x_PRICE',
     vatType: 'TAX',
     description: '비즈니스 핵심 로직 개발 및 DB 인덱스 튜닝',
@@ -276,9 +339,9 @@ export const DEFAULT_COST_ITEMS: CostItem[] = [
     internalName: '백엔드 개발 (L4 Lead)',
     category: '인건비 기준 (용역 공수)',
     unit: 'MD',
-    defaultPrice: 1000000,
+    defaultPrice: 1400000,
     rank: 'L4 Lead',
-    basePrice: 500000,
+    basePrice: 700000,
     formulaType: 'PEOPLE_x_DAYS_x_PRICE',
     vatType: 'TAX',
     description: '서버 아키텍처 설계, 보안 및 배포 PL 리드',
@@ -290,9 +353,9 @@ export const DEFAULT_COST_ITEMS: CostItem[] = [
     internalName: '백엔드 개발 (L5 Director)',
     category: '인건비 기준 (용역 공수)',
     unit: 'MD',
-    defaultPrice: 1500000,
+    defaultPrice: 2100000,
     rank: 'L5 Director',
-    basePrice: 500000,
+    basePrice: 700000,
     formulaType: 'PEOPLE_x_DAYS_x_PRICE',
     vatType: 'TAX',
     description: '인프라 및 백엔드 개발 총괄 디렉터',
@@ -1121,17 +1184,19 @@ export const StorageAPI = {
           items = localItems;
           this.saveCostItems(localItems);
         } else {
-          items = DEFAULT_COST_ITEMS;
-          localStorage.setItem(KEYS.COST_ITEMS, JSON.stringify(DEFAULT_COST_ITEMS));
-          this.saveCostItems(DEFAULT_COST_ITEMS);
+          const healed = healCostItemsFromProjects(DEFAULT_COST_ITEMS);
+          items = healed;
+          localStorage.setItem(KEYS.COST_ITEMS, JSON.stringify(healed));
+          this.saveCostItems(healed);
         }
       }
     } else {
       if (localItems.length > 0) {
         items = localItems;
       } else {
-        items = DEFAULT_COST_ITEMS;
-        localStorage.setItem(KEYS.COST_ITEMS, JSON.stringify(DEFAULT_COST_ITEMS));
+        const healed = healCostItemsFromProjects(DEFAULT_COST_ITEMS);
+        items = healed;
+        localStorage.setItem(KEYS.COST_ITEMS, JSON.stringify(healed));
       }
     }
     
@@ -1823,5 +1888,9 @@ export const StorageAPI = {
         console.warn('[Supabase] saveSettings network error:', e);
       }
     }
+  },
+
+  getHealedDefaultCostItems(): CostItem[] {
+    return healCostItemsFromProjects(DEFAULT_COST_ITEMS);
   }
 };
