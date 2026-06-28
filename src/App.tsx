@@ -216,7 +216,12 @@ export default function App() {
   const handleExportData = async () => {
     const dataStr = await StorageAPI.exportData();
     const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
-    const exportFileDefaultName = `estimate_backup_${new Date().toISOString().split('T')[0]}.json`;
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    const localDateStr = `${year}-${month}-${day}`;
+    const exportFileDefaultName = `estimate_backup_${localDateStr}.json`;
     const linkElement = document.createElement('a');
     linkElement.setAttribute('href', dataUri);
     linkElement.setAttribute('download', exportFileDefaultName);
