@@ -24,6 +24,7 @@ import LibraryImportModal from './LibraryImportModal';
 import EstimatePreviewModal from './EstimatePreviewModal';
 import { WbsEditor } from './WbsEditor';
 import TemplateSelectModal from './TemplateSelectModal';
+import ImportProjectSectionsModal from './ImportProjectSectionsModal';
 
 interface EstimatesDashboardProps {
   clients: ClientInfo[];
@@ -68,11 +69,13 @@ export default function EstimatesDashboard({
     handleUpdateRowField,
     handleDeleteRow,
     handleOpenLibraryModal,
-    handleImportSelectedItems
+    handleImportSelectedItems,
+    handleImportSectionsFromProject
   } = estimatesState;
 
   // 로컬 UI/정렬/필터 상태
   const [searchTerm, setSearchTerm] = useState('');
+  const [isImportSectionsModalOpen, setIsImportSectionsModalOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'all' | 'draft' | 'invoicing' | 'completed'>('all');
   const [projectTypeFilter, setProjectTypeFilter] = useState<'all' | 'IT' | 'DESIGN' | 'BUILD' | 'OTHER'>('all');
 
@@ -820,21 +823,41 @@ export default function EstimatesDashboard({
 
                   {/* 새 섹션 추가 대형 버튼 */}
                   {activeProject.approvalStatus !== 'approved' && (
-                    <button 
-                      type="button" 
-                      className="btn btn-secondary" 
-                      onClick={() => {
-                        const newSec: EstimateSection = {
-                          id: `sec-${Date.now()}`,
-                          name: '새 구분 섹션',
-                          rows: []
-                        };
-                        handleUpdateProjectField('sections', [...activeProject.sections, newSec]);
-                      }}
-                      style={{ height: '44px', borderStyle: 'dashed', fontWeight: '700' }}
-                    >
-                      + 신규 구분 섹션 추가
-                    </button>
+                    <div style={{ display: 'flex', gap: '12px' }}>
+                      <button 
+                        type="button" 
+                        className="btn btn-secondary" 
+                        onClick={() => {
+                          const newSec: EstimateSection = {
+                            id: `sec-${Date.now()}`,
+                            name: '새 구분 섹션',
+                            rows: []
+                          };
+                          handleUpdateProjectField('sections', [...activeProject.sections, newSec]);
+                        }}
+                        style={{ flexGrow: 1, height: '44px', borderStyle: 'dashed', fontWeight: '700' }}
+                      >
+                        + 신규 구분 섹션 추가
+                      </button>
+                      <button 
+                        type="button" 
+                        className="btn btn-secondary" 
+                        onClick={() => setIsImportSectionsModalOpen(true)}
+                        style={{ 
+                          height: '44px', 
+                          border: '1px solid rgba(59, 130, 246, 0.3)', 
+                          backgroundColor: '#eff6ff', 
+                          color: 'var(--color-blue)', 
+                          fontWeight: '700',
+                          padding: '0 16px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px'
+                        }}
+                      >
+                        <Copy size={16} /> 다른 견적서 불러오기 (합치기)
+                      </button>
+                    </div>
                   )}
 
                     {/* 비고 및 거래 특약 사항 단독 카드 */}
@@ -1002,6 +1025,17 @@ export default function EstimatesDashboard({
       )}
 
 
+
+      {/* --- 다른 견적서 불러오기 (섹션 & WBS 병합) 모달 --- */}
+      {isImportSectionsModalOpen && activeProject && (
+        <ImportProjectSectionsModal
+          isOpen={isImportSectionsModalOpen}
+          onClose={() => setIsImportSectionsModalOpen(false)}
+          projects={projects}
+          currentProjectId={activeProject.id}
+          onImport={handleImportSectionsFromProject}
+        />
+      )}
 
       {/* --- 인쇄/미리보기 모달 --- */}
       {isPreviewModalOpen && activeProject && (

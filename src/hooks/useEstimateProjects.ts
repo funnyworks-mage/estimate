@@ -697,6 +697,83 @@ export function useEstimateProjects({ user, libraryItems }: UseEstimateProjectsP
     await updateProjectsState(updated);
   };
 
+  // 다른 견적서로부터 섹션 및 WBS 상세 일정 데이터 병합 복제
+  const handleImportSectionsFromProject = async (
+    targetProjectId: string,
+    sectionIds: string[],
+    importWbs: boolean
+  ) => {
+    if (!activeProject) return;
+
+    const targetProj = projects.find(p => p.id === targetProjectId);
+    if (!targetProj) return;
+
+    // 1. 가져올 섹션 필터링
+    const sourceSections = targetProj.sections.filter(sec => sectionIds.includes(sec.id));
+    if (sourceSections.length === 0) return;
+
+    // ID 충돌 방지를 위한 고유 ID 발급 헬퍼
+    const generateId = () => `imported-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+
+    // 새 고유 ID를 발급하여 섹션 및 행(Row) 복제
+    const clonedSections = sourceSections.map(sec => {
+      return {
+        ...sec,
+        id: generateId(),
+        rows: sec.rows.map(row => ({
+          ...row,
+          id: generateId(),
+          isSelected: true // 복제된 데이터는 기본적으로 견적 포함 처리
+        }))
+      };
+    });
+
+    const updatedSections = [...activeProject.sections, ...clonedSections];
+
+    // 2. WBS 복제 및 맵핑 병합
+    let updatedWbs = activeProject.wbs ? JSON.parse(JSON.stringify(activeProject.wbs)) : [];
+
+    if (importWbs && targetProj.wbs && targetProj.wbs.length > 0) {
+      targetProj.wbs.forEach((cat) => {
+        // 동일한 대분류(카테고리)명이 기존 9차에 존재하는지 감지
+        const existingCat = updatedWbs.find((c: any) => c.title.trim() === cat.title.trim());
+
+        const clonedTasks = cat.tasks.map(task => ({
+          ...task,
+          id: generateId(),
+          status: 'planned' // 진행 전으로 초기화하여 이식
+        }));
+
+        if (existingCat) {
+          // 이미 존재하는 대분류이면 하위 태스크 목록만 합류
+          existingCat.tasks = [...existingCat.tasks, ...clonedTasks];
+        } else {
+          // 신규 대분류 카테고리로 안전하게 병합
+          updatedWbs.push({
+            ...cat,
+            id: generateId(),
+            no: updatedWbs.length + 1,
+            tasks: clonedTasks
+          });
+        }
+      });
+    }
+
+    // 3. 전체 프로젝트 상태 갱신 및 DB 저장 동기화
+    const updatedProjects = projects.map(p => {
+      if (p.id === activeProject.id) {
+        return {
+          ...p,
+          sections: updatedSections,
+          wbs: updatedWbs
+        };
+      }
+      return p;
+    });
+
+    await updateProjectsState(updatedProjects);
+  };
+
   return {
     projects,
     setProjects,
@@ -736,6 +813,7 @@ export function useEstimateProjects({ user, libraryItems }: UseEstimateProjectsP
     handleOpenPackageModal,
     handleImportPackage,
     handleUpdateProjectStatus,
+    handleImportSectionsFromProject,
     updateProjectsState
   };
 }
