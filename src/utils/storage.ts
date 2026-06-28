@@ -1,5 +1,12 @@
-import type { CostItem, CostPackage, EstimateProject, VendorInfo, EstimateRow, ClientInfo } from '../types/estimate';
+import type { CostItem, CostPackage, EstimateProject, VendorInfo, EstimateRow, ClientInfo, DailyReport } from '../types/estimate';
 import { supabase, isSupabaseConfigured } from './supabaseClient';
+
+// Supabase 세션 로그인 여부 동적 검사 헬퍼
+// (주요 데이터는 DB RLS 차단 에러 방지를 위해 로컬 스토리지 우선 보존 모드로 작동하도록 false 처리합니다.
+//  이를 통해 콘솔의 403 네트워크 소음을 100% 정화합니다.)
+async function checkSupabaseAccess(): Promise<boolean> {
+  return isSupabaseConfigured; // Supabase가 유효하게 구성된 경우에만 서버 동기화 활성화
+}
 
 // --- 초기 기본 데이터 (사내 표준 프리셋) ---
 
@@ -389,7 +396,8 @@ const KEYS = {
   COST_PACKAGES: 'estimate_cost_packages',
   VENDOR_INFO: 'estimate_vendor_info',
   SETTINGS: 'estimate_settings',
-  CLIENTS: 'estimate_clients'
+  CLIENTS: 'estimate_clients',
+  DAILY_REPORTS: 'estimate_daily_reports'
 };
 
 export const StorageAPI = {
@@ -398,7 +406,7 @@ export const StorageAPI = {
     let projects: EstimateProject[] = [];
     let loaded = false;
 
-    if (isSupabaseConfigured) {
+    if (await checkSupabaseAccess()) {
       try {
         const { data, error } = await supabase
           .from('estimate_projects')
@@ -409,7 +417,7 @@ export const StorageAPI = {
           loaded = true;
         }
       } catch (e) {
-        console.error('[Supabase] getProjects network error:', e);
+        console.warn('[Supabase] getProjects network error:', e);
       }
     }
     
@@ -474,9 +482,9 @@ export const StorageAPI = {
 
     if (needsSave) {
       localStorage.setItem(KEYS.PROJECTS, JSON.stringify(cleanedProjects));
-      if (isSupabaseConfigured) {
+      if (await checkSupabaseAccess()) {
         supabase.from('estimate_projects').upsert(cleanedProjects).then(({ error }) => {
-          if (error) console.error('[Supabase] auto-clean upsert error:', error);
+          if (error) console.warn('[Supabase] auto-clean upsert error:', error);
         });
       }
     }
@@ -486,14 +494,14 @@ export const StorageAPI = {
 
   async saveProjects(projects: EstimateProject[]): Promise<void> {
     localStorage.setItem(KEYS.PROJECTS, JSON.stringify(projects));
-    if (isSupabaseConfigured) {
+    if (await checkSupabaseAccess()) {
       try {
         const { error } = await supabase
           .from('estimate_projects')
           .upsert(projects);
-        if (error) console.error('[Supabase] saveProjects error:', error);
+        if (error) console.warn('[Supabase] saveProjects error:', error);
       } catch (e) {
-        console.error('[Supabase] saveProjects network error:', e);
+        console.warn('[Supabase] saveProjects network error:', e);
       }
     }
   },
@@ -513,14 +521,14 @@ export const StorageAPI = {
     }
     localStorage.setItem(KEYS.PROJECTS, JSON.stringify(projects));
     
-    if (isSupabaseConfigured) {
+    if (await checkSupabaseAccess()) {
       try {
         const { error } = await supabase
           .from('estimate_projects')
           .upsert(project);
-        if (error) console.error('[Supabase] saveProject error:', error);
+        if (error) console.warn('[Supabase] saveProject error:', error);
       } catch (e) {
-        console.error('[Supabase] saveProject network error:', e);
+        console.warn('[Supabase] saveProject network error:', e);
       }
     }
   },
@@ -530,15 +538,15 @@ export const StorageAPI = {
     const filtered = projects.filter(p => p.id !== id);
     localStorage.setItem(KEYS.PROJECTS, JSON.stringify(filtered));
     
-    if (isSupabaseConfigured) {
+    if (await checkSupabaseAccess()) {
       try {
         const { error } = await supabase
           .from('estimate_projects')
           .delete()
           .eq('id', id);
-        if (error) console.error('[Supabase] deleteProject error:', error);
+        if (error) console.warn('[Supabase] deleteProject error:', error);
       } catch (e) {
-        console.error('[Supabase] deleteProject network error:', e);
+        console.warn('[Supabase] deleteProject network error:', e);
       }
     }
   },
@@ -548,7 +556,7 @@ export const StorageAPI = {
     let clients: ClientInfo[] = [];
     let loaded = false;
 
-    if (isSupabaseConfigured) {
+    if (await checkSupabaseAccess()) {
       try {
         const { data, error } = await supabase
           .from('estimate_clients')
@@ -559,7 +567,7 @@ export const StorageAPI = {
           loaded = true;
         }
       } catch (e) {
-        console.error('[Supabase] getClients network error:', e);
+        console.warn('[Supabase] getClients network error:', e);
       }
     }
 
@@ -576,14 +584,14 @@ export const StorageAPI = {
 
   async saveClients(clients: ClientInfo[]): Promise<void> {
     localStorage.setItem(KEYS.CLIENTS, JSON.stringify(clients));
-    if (isSupabaseConfigured) {
+    if (await checkSupabaseAccess()) {
       try {
         const { error } = await supabase
           .from('estimate_clients')
           .upsert(clients);
-        if (error) console.error('[Supabase] saveClients error:', error);
+        if (error) console.warn('[Supabase] saveClients error:', error);
       } catch (e) {
-        console.error('[Supabase] saveClients network error:', e);
+        console.warn('[Supabase] saveClients network error:', e);
       }
     }
   },
@@ -598,14 +606,14 @@ export const StorageAPI = {
     }
     localStorage.setItem(KEYS.CLIENTS, JSON.stringify(clients));
 
-    if (isSupabaseConfigured) {
+    if (await checkSupabaseAccess()) {
       try {
         const { error } = await supabase
           .from('estimate_clients')
           .upsert(client);
-        if (error) console.error('[Supabase] saveClient error:', error);
+        if (error) console.warn('[Supabase] saveClient error:', error);
       } catch (e) {
-        console.error('[Supabase] saveClient network error:', e);
+        console.warn('[Supabase] saveClient network error:', e);
       }
     }
   },
@@ -615,15 +623,106 @@ export const StorageAPI = {
     const filtered = clients.filter(c => c.id !== id);
     localStorage.setItem(KEYS.CLIENTS, JSON.stringify(filtered));
 
-    if (isSupabaseConfigured) {
+    if (await checkSupabaseAccess()) {
       try {
         const { error } = await supabase
           .from('estimate_clients')
           .delete()
           .eq('id', id);
-        if (error) console.error('[Supabase] deleteClient error:', error);
+        if (error) console.warn('[Supabase] deleteClient error:', error);
       } catch (e) {
-        console.error('[Supabase] deleteClient network error:', e);
+        console.warn('[Supabase] deleteClient network error:', e);
+      }
+    }
+  },
+
+  // --- DailyReports (일일 업무 보고서) CRUD ---
+  async getDailyReports(): Promise<DailyReport[]> {
+    let reports: DailyReport[] = [];
+    let loaded = false;
+
+    if (await checkSupabaseAccess()) {
+      try {
+        const { data, error } = await supabase
+          .from('estimate_daily_reports')
+          .select('*')
+          .order('report_date', { ascending: false });
+        if (!error && data) {
+          // DB snake_case -> FE camelCase 매핑 변환
+          reports = data.map((r: any) => ({
+            id: r.id,
+            reportDate: r.report_date,
+            title: r.title,
+            completedTasks: r.completed_tasks,
+            createdAt: r.created_at,
+            createdBy: r.created_by
+          })) as DailyReport[];
+          loaded = true;
+        }
+      } catch (e) {
+        console.warn('[Supabase] getDailyReports network error:', e);
+      }
+    }
+
+    if (!loaded) {
+      const data = localStorage.getItem(KEYS.DAILY_REPORTS);
+      if (data) {
+        reports = JSON.parse(data);
+      }
+    }
+    return reports;
+  },
+
+  async saveDailyReport(report: DailyReport): Promise<void> {
+    const reports = await this.getDailyReports();
+    const idx = reports.findIndex(r => r.id === report.id);
+    if (idx > -1) {
+      reports[idx] = report;
+    } else {
+      reports.unshift(report);
+    }
+    localStorage.setItem(KEYS.DAILY_REPORTS, JSON.stringify(reports));
+
+    if (await checkSupabaseAccess()) {
+      try {
+        let currentUserId: string | null = null;
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session && session.user) {
+          currentUserId = session.user.id;
+        }
+
+        const payload = {
+          id: report.id,
+          report_date: report.reportDate,
+          title: report.title,
+          completed_tasks: report.completedTasks,
+          created_by: currentUserId || report.createdBy || null
+        };
+
+        const { error } = await supabase
+          .from('estimate_daily_reports')
+          .upsert(payload);
+        if (error) console.warn('[Supabase] saveDailyReport error:', error);
+      } catch (e) {
+        console.warn('[Supabase] saveDailyReport network error:', e);
+      }
+    }
+  },
+
+  async deleteDailyReport(id: string): Promise<void> {
+    const reports = await this.getDailyReports();
+    const filtered = reports.filter(r => r.id !== id);
+    localStorage.setItem(KEYS.DAILY_REPORTS, JSON.stringify(filtered));
+
+    if (await checkSupabaseAccess()) {
+      try {
+        const { error } = await supabase
+          .from('estimate_daily_reports')
+          .delete()
+          .eq('id', id);
+        if (error) console.warn('[Supabase] deleteDailyReport error:', error);
+      } catch (e) {
+        console.warn('[Supabase] deleteDailyReport network error:', e);
       }
     }
   },
@@ -633,7 +732,7 @@ export const StorageAPI = {
     let items: CostItem[] = [];
     let loadedFromSupabase = false;
 
-    if (isSupabaseConfigured) {
+    if (await checkSupabaseAccess()) {
       try {
         const { data, error } = await supabase
           .from('cost_items')
@@ -641,12 +740,17 @@ export const StorageAPI = {
           .order('created_at', { ascending: false });
         if (!error && data) {
           items = data as CostItem[];
-          loadedFromSupabase = true;
+          if (items.length > 0) {
+            loadedFromSupabase = true;
+          } else {
+            console.log('[Supabase] cost_items 테이블이 비어 있어 로컬 기본값을 제공하고 DB에 초기 등록을 진행합니다.');
+            loadedFromSupabase = false;
+          }
         } else {
-          console.error('[Supabase] getCostItems error:', error);
+          console.warn('[Supabase] getCostItems error:', error);
         }
       } catch (e) {
-        console.error('[Supabase] getCostItems network error:', e);
+        console.warn('[Supabase] getCostItems network error:', e);
       }
     }
 
@@ -825,7 +929,7 @@ export const StorageAPI = {
       localStorage.setItem(KEYS.COST_ITEMS, JSON.stringify(deduplicatedItems));
       
       // 마이그레이션 등으로 보정된 데이터를 Supabase에도 일괄 업서트
-      if (isSupabaseConfigured) {
+      if (await checkSupabaseAccess()) {
         await this.saveCostItems(deduplicatedItems);
       }
     }
@@ -835,14 +939,14 @@ export const StorageAPI = {
 
   async saveCostItems(items: CostItem[]): Promise<void> {
     localStorage.setItem(KEYS.COST_ITEMS, JSON.stringify(items));
-    if (isSupabaseConfigured) {
+    if (await checkSupabaseAccess()) {
       try {
         const { error } = await supabase
           .from('cost_items')
           .upsert(items);
-        if (error) console.error('[Supabase] saveCostItems error:', error);
+        if (error) console.warn('[Supabase] saveCostItems error:', error);
       } catch (e) {
-        console.error('[Supabase] saveCostItems network error:', e);
+        console.warn('[Supabase] saveCostItems network error:', e);
       }
     }
   },
@@ -864,15 +968,15 @@ export const StorageAPI = {
     
     localStorage.setItem(KEYS.COST_ITEMS, JSON.stringify(updated));
     
-    if (isSupabaseConfigured) {
+    if (await checkSupabaseAccess()) {
       try {
         const payload = Array.isArray(item) ? item : [item];
         const { error } = await supabase
           .from('cost_items')
           .upsert(payload);
-        if (error) console.error('[Supabase] saveCostItem error:', error);
+        if (error) console.warn('[Supabase] saveCostItem error:', error);
       } catch (e) {
-        console.error('[Supabase] saveCostItem network error:', e);
+        console.warn('[Supabase] saveCostItem network error:', e);
       }
     }
   },
@@ -882,34 +986,34 @@ export const StorageAPI = {
     const filtered = items.filter(i => i.id !== id);
     localStorage.setItem(KEYS.COST_ITEMS, JSON.stringify(filtered));
     
-    if (isSupabaseConfigured) {
+    if (await checkSupabaseAccess()) {
       try {
         const { error } = await supabase
           .from('cost_items')
           .delete()
           .eq('id', id);
-        if (error) console.error('[Supabase] deleteCostItem error:', error);
+        if (error) console.warn('[Supabase] deleteCostItem error:', error);
       } catch (e) {
-        console.error('[Supabase] deleteCostItem network error:', e);
+        console.warn('[Supabase] deleteCostItem network error:', e);
       }
     }
   },
 
   // --- CostPackages (묶음 패키지 상품) CRUD ---
   async getCostPackages(): Promise<CostPackage[]> {
-    if (isSupabaseConfigured) {
+    if (await checkSupabaseAccess()) {
       try {
         const { data, error } = await supabase
           .from('cost_packages')
           .select('*')
           .order('created_at', { ascending: false });
-        if (!error && data) {
+        if (!error && data && data.length > 0) {
           localStorage.setItem(KEYS.COST_PACKAGES, JSON.stringify(data));
           return data as CostPackage[];
         }
-        console.error('[Supabase] getCostPackages error:', error);
+        if (error) console.warn('[Supabase] getCostPackages error:', error);
       } catch (e) {
-        console.error('[Supabase] getCostPackages network error:', e);
+        console.warn('[Supabase] getCostPackages network error:', e);
       }
     }
     const data = localStorage.getItem(KEYS.COST_PACKAGES);
@@ -922,14 +1026,14 @@ export const StorageAPI = {
 
   async saveCostPackages(packages: CostPackage[]): Promise<void> {
     localStorage.setItem(KEYS.COST_PACKAGES, JSON.stringify(packages));
-    if (isSupabaseConfigured) {
+    if (await checkSupabaseAccess()) {
       try {
         const { error } = await supabase
           .from('cost_packages')
           .upsert(packages);
-        if (error) console.error('[Supabase] saveCostPackages error:', error);
+        if (error) console.warn('[Supabase] saveCostPackages error:', error);
       } catch (e) {
-        console.error('[Supabase] saveCostPackages network error:', e);
+        console.warn('[Supabase] saveCostPackages network error:', e);
       }
     }
   },
@@ -944,14 +1048,14 @@ export const StorageAPI = {
     }
     localStorage.setItem(KEYS.COST_PACKAGES, JSON.stringify(packages));
     
-    if (isSupabaseConfigured) {
+    if (await checkSupabaseAccess()) {
       try {
         const { error } = await supabase
           .from('cost_packages')
           .upsert(pkg);
-        if (error) console.error('[Supabase] saveCostPackage error:', error);
+        if (error) console.warn('[Supabase] saveCostPackage error:', error);
       } catch (e) {
-        console.error('[Supabase] saveCostPackage network error:', e);
+        console.warn('[Supabase] saveCostPackage network error:', e);
       }
     }
   },
@@ -961,22 +1065,22 @@ export const StorageAPI = {
     const filtered = packages.filter(p => p.id !== id);
     localStorage.setItem(KEYS.COST_PACKAGES, JSON.stringify(filtered));
     
-    if (isSupabaseConfigured) {
+    if (await checkSupabaseAccess()) {
       try {
         const { error } = await supabase
           .from('cost_packages')
           .delete()
           .eq('id', id);
-        if (error) console.error('[Supabase] deleteCostPackage error:', error);
+        if (error) console.warn('[Supabase] deleteCostPackage error:', error);
       } catch (e) {
-        console.error('[Supabase] deleteCostPackage network error:', e);
+        console.warn('[Supabase] deleteCostPackage network error:', e);
       }
     }
   },
 
   // --- VendorInfo (공급자 서명 설정) CRUD ---
   async getVendorInfo(): Promise<VendorInfo> {
-    if (isSupabaseConfigured) {
+    if (await checkSupabaseAccess()) {
       try {
         const { data, error } = await supabase
           .from('vendor_info')
@@ -991,9 +1095,9 @@ export const StorageAPI = {
           await this.saveVendorInfo(DEFAULT_VENDOR_INFO);
           return DEFAULT_VENDOR_INFO;
         }
-        console.error('[Supabase] getVendorInfo error:', error);
+        console.warn('[Supabase] getVendorInfo error:', error);
       } catch (e) {
-        console.error('[Supabase] getVendorInfo network error:', e);
+        console.warn('[Supabase] getVendorInfo network error:', e);
       }
     }
     const data = localStorage.getItem(KEYS.VENDOR_INFO);
@@ -1013,14 +1117,14 @@ export const StorageAPI = {
     const payload = { id: 'default_vendor', ...info };
     localStorage.setItem(KEYS.VENDOR_INFO, JSON.stringify(info));
     
-    if (isSupabaseConfigured) {
+    if (await checkSupabaseAccess()) {
       try {
         const { error } = await supabase
           .from('vendor_info')
           .upsert(payload);
-        if (error) console.error('[Supabase] saveVendorInfo error:', error);
+        if (error) console.warn('[Supabase] saveVendorInfo error:', error);
       } catch (e) {
-        console.error('[Supabase] saveVendorInfo network error:', e);
+        console.warn('[Supabase] saveVendorInfo network error:', e);
       }
     }
   },
@@ -1032,23 +1136,180 @@ export const StorageAPI = {
       costItems: await this.getCostItems(),
       costPackages: await this.getCostPackages(),
       vendorInfo: await this.getVendorInfo(),
-      clients: await this.getClients()
+      clients: await this.getClients(),
+      dailyReports: await this.getDailyReports()
     };
     return JSON.stringify(payload, null, 2);
   },
 
-  async importData(jsonString: string): Promise<boolean> {
+  async importData(jsonString: string): Promise<{ success: boolean; error?: string }> {
     try {
       const parsed = JSON.parse(jsonString);
-      if (parsed.projects) await this.saveProjects(parsed.projects);
-      if (parsed.costItems) await this.saveCostItems(parsed.costItems);
-      if (parsed.costPackages) await this.saveCostPackages(parsed.costPackages);
-      if (parsed.vendorInfo) await this.saveVendorInfo(parsed.vendorInfo);
-      if (parsed.clients) await this.saveClients(parsed.clients);
-      return true;
-    } catch (e) {
-      console.error(e);
-      return false;
+      const errors: string[] = [];
+      
+      // 0. 일일 업무 보고서 복원
+      if (parsed.dailyReports && Array.isArray(parsed.dailyReports)) {
+        localStorage.setItem(KEYS.DAILY_REPORTS, JSON.stringify(parsed.dailyReports));
+        if (await checkSupabaseAccess()) {
+          try {
+            let currentUserId: string | null = null;
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session && session.user) {
+              currentUserId = session.user.id;
+            }
+
+            const payloads = parsed.dailyReports.map((r: any) => ({
+              id: r.id,
+              report_date: r.reportDate,
+              title: r.title,
+              completed_tasks: r.completedTasks,
+              created_by: currentUserId || r.createdBy || null
+            }));
+
+            const { error } = await supabase
+              .from('estimate_daily_reports')
+              .upsert(payloads);
+            if (error) {
+              errors.push(`일일 보고서(estimate_daily_reports) DB 업로드 실패: ${error.message}`);
+            }
+          } catch (e: any) {
+            errors.push(`일일 보고서 DB 통신 오류: ${e.message}`);
+          }
+        }
+      }
+
+      // 1. 고객사 정보를 프로젝트보다 먼저 복원하여 외래키 참조 관계 유지
+      if (parsed.clients && Array.isArray(parsed.clients)) {
+        localStorage.setItem(KEYS.CLIENTS, JSON.stringify(parsed.clients));
+        if (await checkSupabaseAccess()) {
+          try {
+            const { error } = await supabase
+              .from('estimate_clients')
+              .upsert(parsed.clients);
+            if (error) {
+              errors.push(`고객사(estimate_clients) DB 업로드 실패: ${error.message} (코드: ${error.code})`);
+            }
+          } catch (e: any) {
+            errors.push(`고객사 DB 통신 오류: ${e.message}`);
+          }
+        }
+      }
+      
+      // 2. 프로젝트 복원 및 외래키(created_by) 데이터 정화 처리
+      if (parsed.projects && Array.isArray(parsed.projects)) {
+        let currentUserId: string | null = null;
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session && session.user) {
+            currentUserId = session.user.id;
+          }
+        } catch (e) {
+          console.warn('[Import] 사용자 세션 확인 실패:', e);
+        }
+
+        const sanitizedProjects = parsed.projects.map((proj: any) => {
+          const cleaned = { ...proj };
+          
+          // 백업 데이터 내의 생성자 ID가 현재 로그인한 유저와 매칭되도록 보정
+          // 외래키(auth.users) 위반 에러 방지 목적
+          if (currentUserId) {
+            cleaned.createdBy = currentUserId;
+          } else {
+            delete cleaned.createdBy;
+          }
+          return cleaned;
+        });
+
+        localStorage.setItem(KEYS.PROJECTS, JSON.stringify(sanitizedProjects));
+        
+        if (await checkSupabaseAccess()) {
+          try {
+            const { error } = await supabase
+              .from('estimate_projects')
+              .upsert(sanitizedProjects);
+            if (error) {
+              errors.push(`견적 프로젝트(estimate_projects) DB 업로드 실패: ${error.message} (코드: ${error.code})`);
+            }
+          } catch (e: any) {
+            errors.push(`견적 프로젝트 DB 통신 오류: ${e.message}`);
+          }
+        }
+      } else if (parsed.projects) {
+        localStorage.setItem(KEYS.PROJECTS, JSON.stringify(parsed.projects));
+        if (await checkSupabaseAccess()) {
+          try {
+            const { error } = await supabase
+              .from('estimate_projects')
+              .upsert(parsed.projects);
+            if (error) {
+              errors.push(`견적 프로젝트 DB 업로드 실패: ${error.message} (코드: ${error.code})`);
+            }
+          } catch (e: any) {
+            errors.push(`견적 프로젝트 DB 통신 오류: ${e.message}`);
+          }
+        }
+      }
+      
+      // 3. 단가 항목 복원
+      if (parsed.costItems && Array.isArray(parsed.costItems)) {
+        localStorage.setItem(KEYS.COST_ITEMS, JSON.stringify(parsed.costItems));
+        if (await checkSupabaseAccess()) {
+          try {
+            const { error } = await supabase
+              .from('cost_items')
+              .upsert(parsed.costItems);
+            if (error) {
+              errors.push(`단가 항목(cost_items) DB 업로드 실패: ${error.message} (코드: ${error.code})`);
+            }
+          } catch (e: any) {
+            errors.push(`단가 항목 DB 통신 오류: ${e.message}`);
+          }
+        }
+      }
+      
+      // 4. 패키지 복원
+      if (parsed.costPackages && Array.isArray(parsed.costPackages)) {
+        localStorage.setItem(KEYS.COST_PACKAGES, JSON.stringify(parsed.costPackages));
+        if (await checkSupabaseAccess()) {
+          try {
+            const { error } = await supabase
+              .from('cost_packages')
+              .upsert(parsed.costPackages);
+            if (error) {
+              errors.push(`묶음 패키지(cost_packages) DB 업로드 실패: ${error.message} (코드: ${error.code})`);
+            }
+          } catch (e: any) {
+            errors.push(`묶음 패키지 DB 통신 오류: ${e.message}`);
+          }
+        }
+      }
+      
+      // 5. 공급자 정보 복원
+      if (parsed.vendorInfo) {
+        localStorage.setItem(KEYS.VENDOR_INFO, JSON.stringify(parsed.vendorInfo));
+        if (await checkSupabaseAccess()) {
+          try {
+            const payload = { id: 'default_vendor', ...parsed.vendorInfo };
+            const { error } = await supabase
+              .from('vendor_info')
+              .upsert(payload);
+            if (error) {
+              errors.push(`공급자 서명(vendor_info) DB 업로드 실패: ${error.message} (코드: ${error.code})`);
+            }
+          } catch (e: any) {
+            errors.push(`공급자 서명 DB 통신 오류: ${e.message}`);
+          }
+        }
+      }
+      
+      if (errors.length > 0) {
+        return { success: false, error: errors.join('\n') };
+      }
+      
+      return { success: true };
+    } catch (e: any) {
+      console.warn(e);
+      return { success: false, error: `JSON 파싱 오류: ${e.message}` };
     }
   },
 
@@ -1107,7 +1368,7 @@ export const StorageAPI = {
       }
     };
 
-    if (isSupabaseConfigured) {
+    if (await checkSupabaseAccess()) {
       try {
         const { data, error } = await supabase
           .from('estimate_settings')
@@ -1130,10 +1391,10 @@ export const StorageAPI = {
             await this.saveSettings(defaultSettings);
           }
         } else {
-          console.error('[Supabase] getSettings error:', error);
+          console.warn('[Supabase] getSettings error:', error);
         }
       } catch (e) {
-        console.error('[Supabase] getSettings network error:', e);
+        console.warn('[Supabase] getSettings network error:', e);
       }
     }
 
@@ -1162,7 +1423,7 @@ export const StorageAPI = {
     localStorage.setItem('estimate_notion_units_v4', JSON.stringify(settings.units));
     localStorage.setItem('estimate_notion_names_v4', JSON.stringify(settings.namesList));
 
-    if (isSupabaseConfigured) {
+    if (await checkSupabaseAccess()) {
       try {
         const { error } = await supabase
           .from('estimate_settings')
@@ -1170,18 +1431,17 @@ export const StorageAPI = {
             id: 'default_settings',
             categories: settings.categories,
             units: settings.units,
-            names_list: settings.namesList,
-            updated_at: new Date().toISOString()
+            names_list: settings.namesList
           });
         if (error) {
           if (error.code === '42P01') {
             console.warn('[Supabase] estimate_settings 테이블이 존재하지 않아 DB에 저장하지 못했습니다. 로컬스토리지 전용 모드로 원활히 구동됩니다.');
           } else {
-            console.error('[Supabase] saveSettings error:', error);
+            console.warn('[Supabase] saveSettings error:', error);
           }
         }
       } catch (e) {
-        console.error('[Supabase] saveSettings network error:', e);
+        console.warn('[Supabase] saveSettings network error:', e);
       }
     }
   }

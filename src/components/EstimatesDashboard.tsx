@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { 
   Plus, 
   Trash2, 
@@ -7,20 +7,12 @@ import {
   Eye, 
   ArrowLeft, 
   Building2, 
-  Check, 
   X, 
-  HelpCircle,
-  Shield,
-  Palette,
-  Terminal,
-  Hammer,
   FileText
 } from 'lucide-react';
 import type { 
-  EstimateProject, 
   ClientInfo, 
   CostItem, 
-  CostPackage, 
   EstimateRow,
   EstimateSection
 } from '../types/estimate';
@@ -28,35 +20,22 @@ import { TOTAL_CORRECTION_PRESETS } from '../types/estimate';
 import { calculateRowAmounts } from '../utils/storage';
 
 // 하위 컴포넌트 임포트
-import ItemFormModal from './ItemFormModal';
-import PackageFormModal from './PackageFormModal';
 import LibraryImportModal from './LibraryImportModal';
-import PackageImportModal from './PackageImportModal';
 import EstimatePreviewModal from './EstimatePreviewModal';
 import { WbsEditor } from './WbsEditor';
 import TemplateSelectModal from './TemplateSelectModal';
 
 interface EstimatesDashboardProps {
-  user: any;
-  userRole: 'member' | 'admin' | 'super_admin' | null;
   clients: ClientInfo[];
   categoriesList: string[];
-  unitsList: string[];
-  namesList: Record<string, string[]>;
   libraryItems: CostItem[];
-  libraryPackages: CostPackage[];
   estimatesState: any; // useEstimateProjects의 리턴 객체
 }
 
 export default function EstimatesDashboard({
-  user,
-  userRole,
   clients,
   categoriesList,
-  unitsList,
-  namesList,
   libraryItems,
-  libraryPackages,
   estimatesState
 }: EstimatesDashboardProps) {
   
@@ -69,7 +48,6 @@ export default function EstimatesDashboard({
     setActiveSubTab,
     customAmountInput,
     setCustomAmountInput,
-    targetSectionId,
     activeProject,
     projectSummary,
     isFormSelectModalOpen,
@@ -78,8 +56,6 @@ export default function EstimatesDashboard({
     setIsPreviewModalOpen,
     isLibraryModalOpen,
     setIsLibraryModalOpen,
-    isPackageModalOpen,
-    setIsPackageModalOpen,
     
     // 동작 메소드
     handleCreateNewProject,
@@ -87,31 +63,22 @@ export default function EstimatesDashboard({
     handleDeleteProject,
     handleUpdateProjectField,
     handleUpdateProjectFields,
-    handleUpdateProjectApproval,
+    handleUpdateProjectStatus,
     handleSyncWbsToEstimate,
     handleUpdateRowField,
     handleDeleteRow,
     handleOpenLibraryModal,
-    handleImportSelectedItems,
-    handleOpenPackageModal,
-    handleImportPackage,
-    updateProjectsState
+    handleImportSelectedItems
   } = estimatesState;
 
   // 로컬 UI/정렬/필터 상태
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'draft' | 'invoicing' | 'completed'>('all');
   const [projectTypeFilter, setProjectTypeFilter] = useState<'all' | 'IT' | 'DESIGN' | 'BUILD' | 'OTHER'>('all');
-  
-  // 에디터 상세 모달 상태들
-  const [isItemCreateModalOpen, setIsItemCreateModalOpen] = useState(false);
-  const [isPackageCreateModalOpen, setIsPackageCreateModalOpen] = useState(false);
-  const [editingItem, setEditingItem] = useState<CostItem | null>(null);
-  const [editingPackage, setEditingPackage] = useState<CostPackage | null>(null);
 
   // --- 프로젝트 필터링 & 검색 연산 ---
   const filteredProjects = useMemo(() => {
-    const filtered = projects.filter(p => {
+    const filtered = projects.filter((p: any) => {
       const matchSearch = p.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
                           (p.clientName && p.clientName.toLowerCase().includes(searchTerm.toLowerCase()));
       const matchStatus = statusFilter === 'all' || p.status === statusFilter;
@@ -120,7 +87,7 @@ export default function EstimatesDashboard({
     });
 
     // 정렬 규칙 보장: 견적일자(estimateDate) 내림차순(최신순) -> 동일할 시 생성일자(createdAt) 내림차순(최신순)
-    return [...filtered].sort((a, b) => {
+    return [...filtered].sort((a: any, b: any) => {
       const dateA = a.estimateDate || '';
       const dateB = b.estimateDate || '';
       if (dateA !== dateB) {
@@ -131,38 +98,6 @@ export default function EstimatesDashboard({
       return createdB - createdA;
     });
   }, [projects, searchTerm, statusFilter, projectTypeFilter]);
-
-  // --- 테이블에 인건비용 (인원, 기간) 컬럼을 노출할지 여부 결정 ---
-  const shouldShowHRColumns = useMemo(() => {
-    if (!activeProject) return false;
-    return activeProject.projectType === 'IT' || 
-           activeProject.projectType === 'DESIGN' ||
-           activeProject.sections.some(s => s.rows.some(r => r.formulaType === 'PEOPLE_x_DAYS_x_PRICE'));
-  }, [activeProject]);
-
-  // 등급 라벨 번역 헬퍼
-  const getRoleLabel = (role: typeof userRole) => {
-    switch (role) {
-      case 'super_admin': return '슈퍼관리자';
-      case 'admin': return '관리자';
-      case 'member': return '일반 회원';
-      default: return '미정';
-    }
-  };
-
-  // 프로젝트 상태별 한글화 배지 헬퍼
-  const getStatusBadge = (status: 'draft' | 'invoicing' | 'completed') => {
-    switch (status) {
-      case 'draft':
-        return <span style={{ backgroundColor: '#e2e8f0', color: '#4a5568', fontSize: '11px', padding: '2px 8px', borderRadius: '4px', fontWeight: '700' }}>견적 작성</span>;
-      case 'invoicing':
-        return <span style={{ backgroundColor: '#e3f2fd', color: '#0d47a1', fontSize: '11px', padding: '2px 8px', borderRadius: '4px', fontWeight: '700' }}>청구 진행</span>;
-      case 'completed':
-        return <span style={{ backgroundColor: '#e8f5e9', color: '#1b5e20', fontSize: '11px', padding: '2px 8px', borderRadius: '4px', fontWeight: '700' }}>수금 완료</span>;
-      default:
-        return null;
-    }
-  };
 
   return (
     <div className="workspace">
@@ -211,14 +146,14 @@ export default function EstimatesDashboard({
 
           {/* 프로젝트 그리드 레이아웃 */}
           <div className="library-grid">
-            {filteredProjects.map(proj => {
+            {filteredProjects.map((proj: any) => {
               // 해당 프로젝트의 금액 합산 연산
               let projSupply = 0;
               let projVat = 0;
               const isForeign = !!proj.useForeignCurrency;
 
-              proj.sections.forEach(s => {
-                s.rows.forEach(r => {
+              proj.sections.forEach((s: any) => {
+                s.rows.forEach((r: any) => {
                   if (r.isSelected) {
                     projSupply += r.supplyPrice;
                     projVat += isForeign ? 0 : r.vat;
@@ -547,7 +482,7 @@ export default function EstimatesDashboard({
                   </div>
 
                   {/* 섹션 및 테이블 그리드 에디터 루프 */}
-                  {activeProject.sections.map(section => {
+                  {activeProject.sections.map((section: any) => {
                     const isApproved = false;
                     
                     // 섹션별 소계 계산
@@ -555,7 +490,7 @@ export default function EstimatesDashboard({
                     let secVat = 0;
                     const isForeign = !!activeProject.useForeignCurrency;
                     
-                    section.rows.forEach(r => {
+                    section.rows.forEach((r: any) => {
                       if (r.isSelected) {
                         secSupply += r.supplyPrice;
                         secVat += isForeign ? 0 : r.vat;
@@ -569,7 +504,7 @@ export default function EstimatesDashboard({
                             type="text" 
                             value={section.name} 
                             onChange={(e) => {
-                              const updatedSections = activeProject.sections.map(s => s.id === section.id ? { ...s, name: e.target.value } : s);
+                              const updatedSections = activeProject.sections.map((s: any) => s.id === section.id ? { ...s, name: e.target.value } : s);
                               handleUpdateProjectField('sections', updatedSections);
                             }}
                             disabled={isApproved}
@@ -583,7 +518,7 @@ export default function EstimatesDashboard({
                               </button>
                               <button type="button" className="btn btn-danger btn-sm" onClick={() => {
                                 if (confirm('이 섹션과 포함된 모든 항목을 삭제하시겠습니까?')) {
-                                  const updatedSections = activeProject.sections.filter(s => s.id !== section.id);
+                                  const updatedSections = activeProject.sections.filter((s: any) => s.id !== section.id);
                                   handleUpdateProjectField('sections', updatedSections);
                                 }
                               }}>
@@ -610,7 +545,7 @@ export default function EstimatesDashboard({
                               </tr>
                             </thead>
                             <tbody>
-                              {section.rows.map(row => (
+                              {section.rows.map((row: any) => (
                                 <tr key={row.id} style={{ borderBottom: '1px solid var(--border-color)', opacity: row.isSelected ? 1 : 0.4 }}>
                                   {/* 선택 체크박스 */}
                                   <td style={{ textAlign: 'center', verticalAlign: 'middle', padding: '12px 8px' }}>
@@ -803,7 +738,7 @@ export default function EstimatesDashboard({
                                         };
                                         const calculated = calculateRowAmounts(newRow);
                                         const fullRow = { ...newRow, ...calculated } as EstimateRow;
-                                        const updatedSections = activeProject.sections.map(s => s.id === section.id ? { ...s, rows: [...s.rows, fullRow] } : s);
+                                        const updatedSections = activeProject.sections.map((s: any) => s.id === section.id ? { ...s, rows: [...s.rows, fullRow] } : s);
                                         handleUpdateProjectField('sections', updatedSections);
                                       }}
                                       style={{ width: '100%', height: '32px', borderStyle: 'dashed' }}
@@ -895,7 +830,7 @@ export default function EstimatesDashboard({
                       <div className="summary-row">
                         <span>선택 품목 수:</span>
                         <span>
-                          {activeProject.sections.reduce((acc, sec) => acc + sec.rows.filter(r => r.isSelected).length, 0)}개
+                          {activeProject.sections.reduce((acc: number, sec: any) => acc + sec.rows.filter((r: any) => r.isSelected).length, 0)}개
                         </span>
                       </div>
 

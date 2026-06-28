@@ -65,37 +65,38 @@ interface HRGroupCardProps {
 
 export function HRGroupCard({ name, items, repItem, onEdit, onDeleteGroup }: HRGroupCardProps) {
   return (
-    <div className="library-card animate-hover" style={{ gridColumn: '1 / -1', minHeight: 'auto', padding: '20px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '20px', flexWrap: 'wrap' }}>
+    <div className="library-card animate-hover" style={{ gridColumn: '1 / -1', minHeight: 'auto', padding: '12px 16px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
         
-        <div style={{ flex: '1', minWidth: '240px' }}>
-          <div className="library-card-header" style={{ marginBottom: '8px' }}>
-            <span className="library-card-badge" style={{ backgroundColor: 'rgba(49, 130, 246, 0.08)', color: 'var(--color-blue)', border: '1px solid rgba(49, 130, 246, 0.15)' }}>
-              {repItem.category} (통합 그룹)
+        {/* 1열: 직군 정보 */}
+        <div style={{ flex: '1.2', minWidth: '200px' }}>
+          <div className="library-card-header" style={{ marginBottom: '4px' }}>
+            <span className="library-card-badge" style={{ backgroundColor: 'rgba(49, 130, 246, 0.08)', color: 'var(--color-blue)', border: '1px solid rgba(49, 130, 246, 0.15)', padding: '1px 6px', fontSize: '10px' }}>
+              {repItem.category}
             </span>
-            <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
+            <span style={{ fontSize: '10px', color: 'var(--text-tertiary)' }}>
               {repItem.vatType === 'TAX' ? '과세(10%)' : repItem.vatType === 'FREE' ? '면세' : '영세'}
             </span>
           </div>
-          <div className="library-card-title" style={{ fontSize: '18px', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '8px', margin: '4px 0 6px 0' }}>
+          <div className="library-card-title" style={{ fontSize: '15px', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '6px', margin: '0 0 4px 0' }}>
             {name}
-            <span style={{ fontSize: '10px', fontWeight: '600', color: 'var(--color-blue)', backgroundColor: 'var(--color-blue-light)', padding: '2px 8px', borderRadius: '12px', border: '1px solid rgba(49, 130, 246, 0.15)' }}>
-              {items.length}대 레벨 통합
+            <span style={{ fontSize: '9px', fontWeight: '600', color: 'var(--color-blue)', backgroundColor: 'var(--color-blue-light)', padding: '1px 6px', borderRadius: '10px', border: '1px solid rgba(49, 130, 246, 0.12)' }}>
+              {items.length}레벨
             </span>
           </div>
-          <div className="library-card-formula" style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-            계산 방식: {
+          <div className="library-card-formula" style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
+            계산: {
               repItem.formulaType === 'QTY_x_PRICE' ? '수량 × 단가' :
               repItem.formulaType === 'PEOPLE_x_DAYS_x_PRICE' ? '인원 × 일수 × 단가' :
               repItem.formulaType === 'MD_x_PRICE' ? '투입 MD × 단가' :
               repItem.formulaType === 'MONTHS_x_PRICE' ? '개월 수 × 단가' : '고정 금액'
-            } (단위: {repItem.unit})
+            } ({repItem.unit})
           </div>
         </div>
 
-        {/* 3/4/5대 레벨 단가 동적 분할 배치 */}
-        <div style={{ flex: '2', minWidth: '320px' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${items.length}, 1fr)`, gap: '8px' }}>
+        {/* 2열: 3/4/5대 레벨 단가 동적 분할 배치 */}
+        <div style={{ flex: '2.5', minWidth: '300px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${items.length}, 1fr)`, gap: '6px' }}>
             {items.map((gi) => {
               const shortRank = gi.rank 
                 ? gi.rank
@@ -125,21 +126,20 @@ export function HRGroupCard({ name, items, repItem, onEdit, onDeleteGroup }: HRG
                 <div 
                   key={gi.id} 
                   style={{ 
-                    padding: '10px 6px', 
-                    backgroundColor: isBase ? 'rgba(49, 130, 246, 0.05)' : 'var(--bg-secondary)', 
-                    border: isBase ? '1.5px solid var(--color-blue)' : '1px solid var(--border-color)', 
-                    borderRadius: 'var(--radius-md)', 
-                    textAlign: 'center',
-                    boxShadow: isBase ? '0 2px 8px rgba(49, 130, 246, 0.08)' : 'none'
+                    padding: '6px 4px', 
+                    backgroundColor: isBase ? 'rgba(49, 130, 246, 0.04)' : 'var(--bg-secondary)', 
+                    border: isBase ? '1.2px solid var(--color-blue)' : '1px solid var(--border-color)', 
+                    borderRadius: '6px', 
+                    textAlign: 'center'
                   }}
                 >
-                  <div style={{ fontSize: '11px', fontWeight: '800', color: isBase ? 'var(--color-blue)' : 'var(--text-primary)' }}>
+                  <div style={{ fontSize: '10px', fontWeight: '800', color: isBase ? 'var(--color-blue)' : 'var(--text-primary)' }}>
                     {shortRank}
                   </div>
-                  <div style={{ fontSize: '9px', color: 'var(--text-tertiary)', margin: '2px 0' }}>
-                    {calculatedMult.toFixed(1)}x{isBase ? ' (기준)' : ''}
+                  <div style={{ fontSize: '9px', color: 'var(--text-tertiary)', margin: '1px 0' }}>
+                    {calculatedMult.toFixed(1)}x
                   </div>
-                  <div style={{ fontSize: '13px', fontWeight: '800', color: isBase ? 'var(--color-blue)' : 'var(--text-secondary)' }}>
+                  <div style={{ fontSize: '12px', fontWeight: '800', color: isBase ? 'var(--color-blue)' : 'var(--text-secondary)' }}>
                     ₩{(gi.defaultPrice / 10000).toLocaleString()}만
                   </div>
                 </div>
@@ -147,24 +147,27 @@ export function HRGroupCard({ name, items, repItem, onEdit, onDeleteGroup }: HRG
             })}
           </div>
         </div>
-        
-      </div>
 
-      <div className="library-card-footer" style={{ marginTop: '16px', borderTop: '1px solid var(--border-color)', paddingTop: '12px', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-        <button 
-          type="button"
-          className="btn btn-secondary btn-sm"
-          onClick={() => onEdit(repItem)}
-        >
-          기준 단가 수정
-        </button>
-        <button 
-          type="button"
-          className="btn btn-danger btn-sm"
-          onClick={() => onDeleteGroup(name)}
-        >
-          그룹 일괄 삭제
-        </button>
+        {/* 3열: 관리 버튼 영역 (오른쪽 배치) */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: '85px', alignItems: 'stretch' }}>
+          <button 
+            type="button"
+            className="btn btn-secondary btn-sm"
+            style={{ fontSize: '10px', height: '26px', padding: '0 8px', justifyContent: 'center', fontWeight: '700' }}
+            onClick={() => onEdit(repItem)}
+          >
+            단가 수정
+          </button>
+          <button 
+            type="button"
+            className="btn btn-danger btn-sm"
+            style={{ fontSize: '10px', height: '26px', padding: '0 8px', justifyContent: 'center', fontWeight: '700' }}
+            onClick={() => onDeleteGroup(name)}
+          >
+            그룹 삭제
+          </button>
+        </div>
+        
       </div>
     </div>
   );

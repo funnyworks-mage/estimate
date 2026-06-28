@@ -1,13 +1,12 @@
 import React, { useState } from 'react';
-import { Mail, Lock, LogIn, HelpCircle, ArrowRight } from 'lucide-react';
+import { Mail, Lock, LogIn, HelpCircle } from 'lucide-react';
 import { supabase } from '../utils/supabaseClient';
 
 interface AuthContainerProps {
   onAuthSuccess: (user: any) => void;
-  onSkipAuth: () => void;
 }
 
-export default function AuthContainer({ onAuthSuccess, onSkipAuth }: AuthContainerProps) {
+export default function AuthContainer({ onAuthSuccess }: AuthContainerProps) {
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -205,38 +204,7 @@ export default function AuthContainer({ onAuthSuccess, onSkipAuth }: AuthContain
             {isSignUp ? '로그인하기' : '회원가입하기'}
           </button>
         </div>
-
-        {/* 게스트 모드 스킵 버튼 (로컬 게스트 진입) */}
-        <div style={{ marginTop: '12px', display: 'flex', justifyContent: 'center' }}>
-          <button 
-            type="button" 
-            onClick={onSkipAuth}
-            style={{ 
-              background: 'none', 
-              border: 'none', 
-              color: 'var(--text-secondary)', 
-              fontSize: '11px', 
-              fontWeight: '600',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px',
-              padding: '6px 12px',
-              borderRadius: '6px'
-            }}
-            className="hover-bg-sub"
-          >
-            로그인 없이 오프라인 게스트 모드로 계속하기
-            <ArrowRight size={12} />
-          </button>
-        </div>
       </div>
-      <style>{`
-        .hover-bg-sub:hover {
-          background-color: var(--bg-secondary) !important;
-          color: var(--text-primary) !important;
-        }
-      `}</style>
     </div>
   );
 }

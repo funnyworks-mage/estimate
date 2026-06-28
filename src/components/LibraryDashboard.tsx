@@ -1,9 +1,7 @@
-import React from 'react';
 import { Plus } from 'lucide-react';
-import type { CostItem, CostPackage, EstimateProject } from '../types/estimate';
+import type { CostItem, EstimateProject } from '../types/estimate';
 import { LibraryCard, HRGroupCard, EmptyGroupMessage } from './LibraryCard';
 import ItemFormModal from './ItemFormModal';
-import PackageFormModal from './PackageFormModal';
 
 interface LibraryDashboardProps {
   libraryState: any; // useLibrary 훅의 리턴 값
@@ -17,27 +15,19 @@ export default function LibraryDashboard({
   updateProjectsState 
 }: LibraryDashboardProps) {
   const {
-    libraryItems,
-    libraryPackages,
     categoriesList,
     unitsList,
     namesList,
     isItemCreateModalOpen,
     setIsItemCreateModalOpen,
-    isPackageCreateModalOpen,
-    setIsPackageCreateModalOpen,
     editingItem,
     setEditingItem,
-    editingPackage,
-    setEditingPackage,
     groupedLibraryItems,
     
     // CRUD 핸들러
     handleSaveCostItem,
     handleDeleteCostItem,
     handleDeleteHRGroup,
-    handleSaveCostPackage,
-    handleDeleteCostPackage,
     handleUpdateSettings,
     handleCategoryRename,
     handleUnitRename

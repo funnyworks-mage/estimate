@@ -319,7 +319,7 @@ export default function EstimatePreviewModal({
                     </span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center', borderTop: '1px dashed #ccc', paddingTop: '6px', marginTop: '4px', color: '#555', fontWeight: '600', fontSize: '12px' }}>
-                    <span>원화 환산 금액 (부가세 포함)</span>
+                    <span>원화 환산 금액 {activeProject.useForeignCurrency ? '(부가세 없음)' : '(부가세 포함)'}</span>
                     <span>일금 {convertToKoreanAmount(projectSummary.finalGrandTotal ?? projectSummary.grandTotal)}원정 (₩{(projectSummary.finalGrandTotal ?? projectSummary.grandTotal).toLocaleString()})</span>
                   </div>
                 </>
@@ -414,7 +414,9 @@ export default function EstimatePreviewModal({
                       </td>
                     </tr>
                     <tr className="print-totals-row" style={{ fontWeight: 'normal', backgroundColor: '#fafafa' }}>
-                      <td className="center" style={{ borderRight: '1px solid #000', width: '10%', whiteSpace: 'nowrap', fontSize: '11px', padding: '6px 4px', textAlign: 'center', backgroundColor: '#fafafa' }}>부가세 소계</td>
+                      <td className="center" style={{ borderRight: '1px solid #000', width: '10%', whiteSpace: 'nowrap', fontSize: '11px', padding: '6px 4px', textAlign: 'center', backgroundColor: '#fafafa' }}>
+                        {activeProject.useForeignCurrency ? '부가세 소계 (0%)' : '부가세 소계'}
+                      </td>
                       <td className="num" style={{ borderRight: '1px solid #000', width: '22%', padding: '6px 8px', textAlign: 'right', fontWeight: '600' }}>
                         <div style={{ whiteSpace: 'nowrap' }}>₩{projectSummary.vatTotal.toLocaleString()}</div>
                         {activeProject.useForeignCurrency && activeProject.exchangeRate && (
@@ -501,7 +503,9 @@ export default function EstimatePreviewModal({
                       </td>
                     </tr>
                     <tr className="print-totals-row" style={{ fontWeight: 'normal', backgroundColor: '#fafafa' }}>
-                      <td className="center" style={{ borderRight: '1px solid #000', width: '10%', whiteSpace: 'nowrap', fontSize: '11px', padding: '6px 4px', textAlign: 'center', backgroundColor: '#fafafa' }}>부가세 (10%)</td>
+                      <td className="center" style={{ borderRight: '1px solid #000', width: '10%', whiteSpace: 'nowrap', fontSize: '11px', padding: '6px 4px', textAlign: 'center', backgroundColor: '#fafafa' }}>
+                        {activeProject.useForeignCurrency ? '부가세 (0%)' : '부가세 (10%)'}
+                      </td>
                       <td className="num" style={{ borderRight: '1px solid #000', width: '22%', padding: '6px 8px', textAlign: 'right', fontWeight: '600' }}>
                         <div style={{ whiteSpace: 'nowrap' }}>₩{projectSummary.vatTotal.toLocaleString()}</div>
                         {activeProject.useForeignCurrency && activeProject.exchangeRate && (

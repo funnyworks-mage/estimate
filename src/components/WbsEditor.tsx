@@ -408,7 +408,7 @@ export const WbsEditor: React.FC<WbsEditorProps> = ({ wbs, availableRoles, onCha
           width: 100%;
           border: 1px solid var(--border-color);
           border-radius: var(--radius-sm);
-          padding: 8px 6px;
+          padding: 8px 4px;
           font-size: 13px;
           text-align: center;
           outline: none;
@@ -668,10 +668,8 @@ export const WbsEditor: React.FC<WbsEditorProps> = ({ wbs, availableRoles, onCha
                 <th style={{ width: '220px' }}>작업내용 (중분류)</th>
                 <th>상세 세부내역 (줄바꿈 입력)</th>
                 <th style={{ width: '125px' }}>역할군 연동</th>
-                <th style={{ width: '70px', textAlign: 'center' }}>투입인력</th>
-                <th style={{ width: '70px', textAlign: 'center' }}>투입일수</th>
-                <th style={{ width: '190px', textAlign: 'center' }}>작업 일정 (시작~종료)</th>
-                <th style={{ width: '70px', textAlign: 'center' }}>진척도</th>
+                <th style={{ width: '105px', textAlign: 'center' }}>투입인력</th>
+                <th style={{ width: '105px', textAlign: 'center' }}>투입일수</th>
                 <th style={{ width: '75px', textAlign: 'center' }}>작업 관리</th>
               </tr>
             </thead>
@@ -960,42 +958,7 @@ export const WbsEditor: React.FC<WbsEditorProps> = ({ wbs, availableRoles, onCha
                         />
                       </td>
 
-                      {/* 작업 일정 (시작일 / 종료일) */}
-                      <td>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                          <input 
-                            type="date"
-                            className="wbs-input-text"
-                            style={{ fontSize: '11px', padding: '3px 6px', height: '24px' }}
-                            value={task.startDate || ''}
-                            onChange={(e) => handleUpdateTaskField(cat.id, task.id, 'startDate', e.target.value)}
-                          />
-                          <input 
-                            type="date"
-                            className="wbs-input-text"
-                            style={{ fontSize: '11px', padding: '3px 6px', height: '24px' }}
-                            value={task.endDate || ''}
-                            onChange={(e) => handleUpdateTaskField(cat.id, task.id, 'endDate', e.target.value)}
-                          />
-                        </div>
-                      </td>
 
-                      {/* 진척도 (%) */}
-                      <td>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <input 
-                            type="number"
-                            min="0"
-                            max="100"
-                            step="5"
-                            className="wbs-input-num"
-                            style={{ width: '48px' }}
-                            value={task.progress || 0}
-                            onChange={(e) => handleUpdateTaskField(cat.id, task.id, 'progress', Math.min(100, Math.max(0, Number(e.target.value))))}
-                          />
-                          <span style={{ fontSize: '10px', fontWeight: '600' }}>%</span>
-                        </div>
-                      </td>
 
                       {/* 작업 관리 삭제 액션 */}
                       <td style={{ textAlign: 'center', verticalAlign: 'middle' }}>

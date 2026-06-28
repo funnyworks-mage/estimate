@@ -87,14 +87,19 @@ export interface WbsTask {
   id: string;
   name: string;             // 작업내용 (예: "Claim Now 버튼 노출 정책 변경")
   details: string[];        // 상세 세부 불릿 리스트 (예: ["불릿1", "불릿2"])
-  status: string;           // 완료일 / 진행상황
+  status: 'planned' | 'progress' | 'hold' | 'completed' | string; // 진행상황 (예정, 진행중, 보류, 완료)
   manpower: number;         // 투입인력 (명)
   md: number;               // 투입일수 (MD)
-  role: string; // 연동할 역할군
-  roles?: string[]; // 다중 역할군 연동 지원
+  role: string;             // 연동할 역할군
+  roles?: string[];         // 다중 역할군 연동 지원
   startDate?: string;       // 시작일 (YYYY-MM-DD)
   endDate?: string;         // 종료일 (YYYY-MM-DD)
   progress?: number;        // 진척도 (0 ~ 100)
+  expectedEndDate?: string; // 예상 완료일자 (YYYY-MM-DD)
+  actualEndDate?: string;   // 실제 완료일자 (YYYY-MM-DD)
+  memo?: string;            // 비고 및 메모
+  checkedDetails?: boolean[]; // 상세 세부내역 각 줄별 체크 여부
+  isCustom?: boolean;       // WBS 대시보드에서 퀵 등록한 태스크 여부 (견적서 연동본과 구분)
 }
 
 // WBS 대기능 / 항목 (대분류)
@@ -114,6 +119,25 @@ export interface ClientInfo {
   managerName?: string;
   managerTel?: string;
   memo?: string;
+}
+
+// 일일 업무 보고서 구조
+export interface DailyReport {
+  id: string;
+  reportDate: string;       // 보고서 날짜 (YYYY-MM-DD)
+  title: string;            // 보고서 제목
+  completedTasks: Array<{
+    projectId: string;
+    projectTitle: string;
+    taskId: string;
+    taskName: string;
+    role: string;
+    actualEndDate: string;
+    memo?: string;
+    taskDetails?: string[]; // 상세 세부 작업 내역 중 체크 완료된 목록
+  }>;
+  createdAt: string;
+  createdBy?: string;
 }
 
 // 견적 프로젝트 전체 구조
