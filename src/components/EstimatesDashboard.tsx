@@ -47,7 +47,7 @@ export default function EstimatesDashboard({
     activeSubTab,
     setActiveSubTab,
     customAmountInput,
-    setCustomAmountInput,
+    handleCustomAmountInputChange,
     activeProject,
     projectSummary,
     isFormSelectModalOpen,
@@ -469,8 +469,13 @@ export default function EstimatesDashboard({
                         value={activeProject.totalCorrectionName || ''}
                         onChange={(e) => {
                           const name = e.target.value;
-                          const preset = TOTAL_CORRECTION_PRESETS.find(p => p.name === name);
-                          const rate = preset ? preset.rate : 0;
+                          let rate = 0;
+                          if (name === '수동 금액 조정') {
+                            rate = activeProject.totalCorrectionRate || 0;
+                          } else {
+                            const preset = TOTAL_CORRECTION_PRESETS.find(p => p.name === name);
+                            rate = preset ? preset.rate : 0;
+                          }
                           
                           handleUpdateProjectFields({
                             totalCorrectionName: name,
@@ -481,6 +486,7 @@ export default function EstimatesDashboard({
                         style={{ width: '180px', height: '36px', fontWeight: '600' }}
                       >
                         <option value="">보정 없음 (표준가)</option>
+                        <option value="수동 금액 조정">수동 금액 조정</option>
                         {TOTAL_CORRECTION_PRESETS.map(p => (
                           <option key={p.name} value={p.name}>{p.name} ({p.rate * 100 > 0 ? `+${p.rate * 100}` : p.rate * 100}%)</option>
                         ))}
@@ -494,7 +500,7 @@ export default function EstimatesDashboard({
                             className="input-text" 
                             placeholder="최종 청구 합계 입력"
                             value={customAmountInput}
-                            onChange={(e) => setCustomAmountInput(e.target.value)}
+                            onChange={(e) => handleCustomAmountInputChange(e.target.value)}
                             disabled={activeProject.approvalStatus === 'approved'}
                             style={{ width: '160px', height: '36px', textAlign: 'right', fontWeight: '700', color: 'var(--color-blue)' }}
                           />

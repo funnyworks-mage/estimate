@@ -661,12 +661,13 @@ export function useEstimateProjects({ user, libraryItems }: UseEstimateProjectsP
     projectSummary.finalGrandTotal
   ]);
 
-  // 수동 조정 비율 역산 동기화
-  useEffect(() => {
+  // 수동 조정 비율 역산 동기화 핸들러 (유저 타이핑 시에만 구동하여 진동 루프 완벽 제거)
+  const handleCustomAmountInputChange = (inputValue: string) => {
+    setCustomAmountInput(inputValue);
     if (!activeProject || activeProject.totalCorrectionName !== '수동 금액 조정') return;
-    if (!customAmountInput) return;
+    if (!inputValue) return;
 
-    const numVal = Number(customAmountInput);
+    const numVal = Number(inputValue);
     if (isNaN(numVal) || numVal <= 0) return;
 
     const supplyTotal = projectSummary.supplyTotal;
@@ -683,15 +684,8 @@ export function useEstimateProjects({ user, libraryItems }: UseEstimateProjectsP
     const totalCorrectionAmount = finalSupply - supplyTotal;
     const rate = supplyTotal > 0 ? totalCorrectionAmount / supplyTotal : 0;
 
-    if (Math.abs((activeProject.totalCorrectionRate || 0) - rate) > 0.00001) {
-      handleUpdateProjectField('totalCorrectionRate', rate);
-    }
-  }, [
-    activeProject?.exchangeRate, 
-    activeProject?.useForeignCurrency, 
-    projectSummary.supplyTotal,
-    customAmountInput
-  ]);
+    handleUpdateProjectField('totalCorrectionRate', rate);
+  };
 
   const handleUpdateProjectStatus = async (projectId: string, newStatus: 'draft' | 'invoicing' | 'completed') => {
     const updated = projects.map(p => {
@@ -712,6 +706,7 @@ export function useEstimateProjects({ user, libraryItems }: UseEstimateProjectsP
     setActiveSubTab,
     customAmountInput,
     setCustomAmountInput,
+    handleCustomAmountInputChange,
     targetSectionId,
     activeProject,
     projectSummary,
