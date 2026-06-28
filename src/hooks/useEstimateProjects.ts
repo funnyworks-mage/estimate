@@ -210,6 +210,26 @@ export function useEstimateProjects({ user, libraryItems }: UseEstimateProjectsP
 
   const handleUpdateProjectField = <K extends keyof EstimateProject>(field: K, value: EstimateProject[K]) => {
     if (!activeProject) return;
+
+    // 견적 발행일자 변경 시 유효기간을 30일 뒤 날짜로 자동 연동 갱신
+    if (field === 'estimateDate' && typeof value === 'string' && value) {
+      try {
+        const estDate = new Date(value);
+        if (!isNaN(estDate.getTime())) {
+          estDate.setDate(estDate.getDate() + 30);
+          const expiryString = estDate.toISOString().split('T')[0];
+          
+          handleUpdateProjectFields({
+            estimateDate: value,
+            expiryDate: expiryString
+          });
+          return;
+        }
+      } catch (e) {
+        console.warn('[AutoExpiry] Failed to auto-calculate expiry date:', e);
+      }
+    }
+
     const updated = projects.map(p => {
       if (p.id === activeProject.id) {
         return { ...p, [field]: value };
