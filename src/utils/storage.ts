@@ -10,9 +10,66 @@ async function checkSupabaseAccess(): Promise<boolean> {
 
 // --- 초기 기본 데이터 (사내 표준 프리셋) ---
 
-const DEFAULT_COST_ITEMS: CostItem[] = [
+export const DEFAULT_COST_ITEMS: CostItem[] = [
+  // --- 1. PM 기획 인력 (L1 ~ L5) ---
   {
-    id: 'item-pm',
+    id: 'item-pm-l1',
+    name: 'PM 기획 인력',
+    internalName: 'PM 기획 인력 (L1 Support)',
+    category: '인건비 기준 (용역 공수)',
+    unit: 'MD',
+    defaultPrice: 400000,
+    rank: 'L1 Support',
+    basePrice: 500000,
+    formulaType: 'PEOPLE_x_DAYS_x_PRICE',
+    vatType: 'TAX',
+    description: '기획 보조 및 자료 조사 지원',
+    internalMemo: 'L1 등급 기획 인력'
+  },
+  {
+    id: 'item-pm-l2',
+    name: 'PM 기획 인력',
+    internalName: 'PM 기획 인력 (L2 Operator)',
+    category: '인건비 기준 (용역 공수)',
+    unit: 'MD',
+    defaultPrice: 500000,
+    rank: 'L2 Operator',
+    basePrice: 500000,
+    formulaType: 'PEOPLE_x_DAYS_x_PRICE',
+    vatType: 'TAX',
+    description: '일반 기획 업무 및 회의록 작성',
+    internalMemo: 'L2 등급 기획 인력 (기준 단가)'
+  },
+  {
+    id: 'item-pm-l3',
+    name: 'PM 기획 인력',
+    internalName: 'PM 기획 인력 (L3 Specialist)',
+    category: '인건비 기준 (용역 공수)',
+    unit: 'MD',
+    defaultPrice: 750000,
+    rank: 'L3 Specialist',
+    basePrice: 500000,
+    formulaType: 'PEOPLE_x_DAYS_x_PRICE',
+    vatType: 'TAX',
+    description: '핵심 기능 설계 및 화면 정의서 작성',
+    internalMemo: 'L3 등급 기획 인력'
+  },
+  {
+    id: 'item-pm-l4',
+    name: 'PM 기획 인력',
+    internalName: 'PM 기획 인력 (L4 Lead)',
+    category: '인건비 기준 (용역 공수)',
+    unit: 'MD',
+    defaultPrice: 1000000,
+    rank: 'L4 Lead',
+    basePrice: 500000,
+    formulaType: 'PEOPLE_x_DAYS_x_PRICE',
+    vatType: 'TAX',
+    description: '전체 프로젝트 PL 기획 및 일정 조율',
+    internalMemo: 'L4 등급 기획 인력'
+  },
+  {
+    id: 'item-pm-l5',
     name: 'PM 기획 인력',
     internalName: 'PM 기획 인력 (L5 Director)',
     category: '인건비 기준 (용역 공수)',
@@ -20,27 +77,115 @@ const DEFAULT_COST_ITEMS: CostItem[] = [
     defaultPrice: 1500000,
     rank: 'L5 Director',
     basePrice: 500000,
-    formulaType: 'PEOPLE_x_DAYS_x_PRICE', // 인력형 전환: 인원 * 기간 = MD 공수 자동 환산
+    formulaType: 'PEOPLE_x_DAYS_x_PRICE',
     vatType: 'TAX',
-    description: '기획 및 PM 총괄 업무',
-    internalMemo: '행사 기획 및 현장 총괄 PM 기준'
+    description: '기획 및 PM 총괄 업무, 최종 의사결정',
+    internalMemo: 'L5 등급 기획 인력'
+  },
+
+  // --- 2. 디자이너 투입 (L1 ~ L5) ---
+  {
+    id: 'item-designer-l1',
+    name: '디자이너 투입',
+    internalName: '디자이너 (L1 Support)',
+    category: '인건비 기준 (용역 공수)',
+    unit: 'MD',
+    defaultPrice: 320000,
+    rank: 'L1 Support',
+    basePrice: 400000,
+    formulaType: 'PEOPLE_x_DAYS_x_PRICE',
+    vatType: 'TAX',
+    description: '배너 편집 및 그래픽 리소스 가공',
+    internalMemo: 'L1 등급 디자인 인력'
   },
   {
-    id: 'item-designer',
+    id: 'item-designer-l2',
+    name: '디자이너 투입',
+    internalName: '디자이너 (L2 Operator)',
+    category: '인건비 기준 (용역 공수)',
+    unit: 'MD',
+    defaultPrice: 400000,
+    rank: 'L2 Operator',
+    basePrice: 400000,
+    formulaType: 'PEOPLE_x_DAYS_x_PRICE',
+    vatType: 'TAX',
+    description: '일반 페이지 UI 디자인 및 컴포넌트 제작',
+    internalMemo: 'L2 등급 디자인 인력 (기준 단가)'
+  },
+  {
+    id: 'item-designer-l3',
+    name: '디자이너 투입',
+    internalName: '디자이너 (L3 Specialist)',
+    category: '인건비 기준 (용역 공수)',
+    unit: 'MD',
+    defaultPrice: 600000,
+    rank: 'L3 Specialist',
+    basePrice: 400000,
+    formulaType: 'PEOPLE_x_DAYS_x_PRICE',
+    vatType: 'TAX',
+    description: '주요 화면 UX 설계 및 키비주얼 디자인',
+    internalMemo: 'L3 등급 디자인 인력'
+  },
+  {
+    id: 'item-designer-l4',
     name: '디자이너 투입',
     internalName: '디자이너 (L4 Lead)',
-    category: '디자인 결과물 기준',
+    category: '인건비 기준 (용역 공수)',
     unit: 'MD',
     defaultPrice: 800000,
     rank: 'L4 Lead',
     basePrice: 400000,
-    formulaType: 'PEOPLE_x_DAYS_x_PRICE', // 인력형 전환: 인원 * 기간 = MD 공수 자동 환산
+    formulaType: 'PEOPLE_x_DAYS_x_PRICE',
     vatType: 'TAX',
-    description: 'UI/UX 및 키비주얼 디자인',
-    internalMemo: '산출물 디자인 완료 기준'
+    description: '브랜드 가이드라인 구축 및 디자인 리드',
+    internalMemo: 'L4 등급 디자인 인력'
   },
   {
-    id: 'item-fe',
+    id: 'item-designer-l5',
+    name: '디자이너 투입',
+    internalName: '디자이너 (L5 Director)',
+    category: '인건비 기준 (용역 공수)',
+    unit: 'MD',
+    defaultPrice: 1200000,
+    rank: 'L5 Director',
+    basePrice: 400000,
+    formulaType: 'PEOPLE_x_DAYS_x_PRICE',
+    vatType: 'TAX',
+    description: '디자인 크리에이티브 디렉터 총괄 리더',
+    internalMemo: 'L5 등급 디자인 인력'
+  },
+
+  // --- 3. 프론트엔드 개발 (L1 ~ L5) ---
+  {
+    id: 'item-fe-l1',
+    name: '프론트엔드 개발',
+    internalName: '프론트엔드 개발 (L1 Support)',
+    category: '인건비 기준 (용역 공수)',
+    unit: 'MD',
+    defaultPrice: 320000,
+    rank: 'L1 Support',
+    basePrice: 400000,
+    formulaType: 'PEOPLE_x_DAYS_x_PRICE',
+    vatType: 'TAX',
+    description: '단순 화면 마크업 및 스타일 오류 수정',
+    internalMemo: 'L1 등급 FE 개발 인력'
+  },
+  {
+    id: 'item-fe-l2',
+    name: '프론트엔드 개발',
+    internalName: '프론트엔드 개발 (L2 Operator)',
+    category: '인건비 기준 (용역 공수)',
+    unit: 'MD',
+    defaultPrice: 400000,
+    rank: 'L2 Operator',
+    basePrice: 400000,
+    formulaType: 'PEOPLE_x_DAYS_x_PRICE',
+    vatType: 'TAX',
+    description: '일반 페이지 퍼블리싱 및 컴포넌트 개발',
+    internalMemo: 'L2 등급 FE 개발 인력 (기준 단가)'
+  },
+  {
+    id: 'item-fe-l3',
     name: '프론트엔드 개발',
     internalName: '프론트엔드 개발 (L3 Specialist)',
     category: '인건비 기준 (용역 공수)',
@@ -48,13 +193,85 @@ const DEFAULT_COST_ITEMS: CostItem[] = [
     defaultPrice: 600000,
     rank: 'L3 Specialist',
     basePrice: 400000,
-    formulaType: 'PEOPLE_x_DAYS_x_PRICE', // 인력형 전환: 인원 * 기간 = MD 공수 자동 환산
+    formulaType: 'PEOPLE_x_DAYS_x_PRICE',
     vatType: 'TAX',
-    description: '화면 웹/앱 UI 구현 및 API 연동',
-    internalMemo: '프론트엔드 작업 공수'
+    description: '상태 관리 및 복잡한 비즈니스 로직 API 연동',
+    internalMemo: 'L3 등급 FE 개발 인력'
   },
   {
-    id: 'item-be',
+    id: 'item-fe-l4',
+    name: '프론트엔드 개발',
+    internalName: '프론트엔드 개발 (L4 Lead)',
+    category: '인건비 기준 (용역 공수)',
+    unit: 'MD',
+    defaultPrice: 800000,
+    rank: 'L4 Lead',
+    basePrice: 400000,
+    formulaType: 'PEOPLE_x_DAYS_x_PRICE',
+    vatType: 'TAX',
+    description: '프론트 아키텍처 설계 및 PL 개발 리드',
+    internalMemo: 'L4 등급 FE 개발 인력'
+  },
+  {
+    id: 'item-fe-l5',
+    name: '프론트엔드 개발',
+    internalName: '프론트엔드 개발 (L5 Director)',
+    category: '인건비 기준 (용역 공수)',
+    unit: 'MD',
+    defaultPrice: 1200000,
+    rank: 'L5 Director',
+    basePrice: 400000,
+    formulaType: 'PEOPLE_x_DAYS_x_PRICE',
+    vatType: 'TAX',
+    description: '웹/앱 클라이언트 개발 총괄 디렉터',
+    internalMemo: 'L5 등급 FE 개발 인력'
+  },
+
+  // --- 4. 백엔드 개발 (L1 ~ L5) ---
+  {
+    id: 'item-be-l1',
+    name: '백엔드 개발',
+    internalName: '백엔드 개발 (L1 Support)',
+    category: '인건비 기준 (용역 공수)',
+    unit: 'MD',
+    defaultPrice: 400000,
+    rank: 'L1 Support',
+    basePrice: 500000,
+    formulaType: 'PEOPLE_x_DAYS_x_PRICE',
+    vatType: 'TAX',
+    description: '데이터 검증 로직 구현 및 쿼리 보조',
+    internalMemo: 'L1 등급 BE 개발 인력'
+  },
+  {
+    id: 'item-be-l2',
+    name: '백엔드 개발',
+    internalName: '백엔드 개발 (L2 Operator)',
+    category: '인건비 기준 (용역 공수)',
+    unit: 'MD',
+    defaultPrice: 500000,
+    rank: 'L2 Operator',
+    basePrice: 500000,
+    formulaType: 'PEOPLE_x_DAYS_x_PRICE',
+    vatType: 'TAX',
+    description: '단순 API 엔드포인트 구현 및 테스트',
+    internalMemo: 'L2 등급 BE 개발 인력 (기준 단가)'
+  },
+  {
+    id: 'item-be-l3',
+    name: '백엔드 개발',
+    internalName: '백엔드 개발 (L3 Specialist)',
+    category: '인건비 기준 (용역 공수)',
+    unit: 'MD',
+    defaultPrice: 750000,
+    rank: 'L3 Specialist',
+    basePrice: 500000,
+    formulaType: 'PEOPLE_x_DAYS_x_PRICE',
+    vatType: 'TAX',
+    description: '비즈니스 핵심 로직 개발 및 DB 인덱스 튜닝',
+    internalMemo: 'L3 등급 BE 개발 인력'
+  },
+  {
+    id: 'item-be-l4',
     name: '백엔드 개발',
     internalName: '백엔드 개발 (L4 Lead)',
     category: '인건비 기준 (용역 공수)',
@@ -62,11 +279,27 @@ const DEFAULT_COST_ITEMS: CostItem[] = [
     defaultPrice: 1000000,
     rank: 'L4 Lead',
     basePrice: 500000,
-    formulaType: 'PEOPLE_x_DAYS_x_PRICE', // 인력형 전환: 인원 * 기간 = MD 공수 자동 환산
+    formulaType: 'PEOPLE_x_DAYS_x_PRICE',
     vatType: 'TAX',
-    description: '데이터베이스 설계 및 서버 API 개발',
-    internalMemo: '서버 인프라 구축 포함'
+    description: '서버 아키텍처 설계, 보안 및 배포 PL 리드',
+    internalMemo: 'L4 등급 BE 개발 인력'
   },
+  {
+    id: 'item-be-l5',
+    name: '백엔드 개발',
+    internalName: '백엔드 개발 (L5 Director)',
+    category: '인건비 기준 (용역 공수)',
+    unit: 'MD',
+    defaultPrice: 1500000,
+    rank: 'L5 Director',
+    basePrice: 500000,
+    formulaType: 'PEOPLE_x_DAYS_x_PRICE',
+    vatType: 'TAX',
+    description: '인프라 및 백엔드 개발 총괄 디렉터',
+    internalMemo: 'L5 등급 BE 개발 인력'
+  },
+
+  // --- 5. 현장 스태프 인력들 ---
   {
     id: 'item-staff-helper',
     name: '현장 보조 스태프',
@@ -115,6 +348,8 @@ const DEFAULT_COST_ITEMS: CostItem[] = [
     description: '행사 총괄 기획 및 클라이언트 최종 커뮤니케이션',
     internalMemo: '프로젝트 총괄 PM 기준'
   },
+
+  // --- 6. 기타/디자인 결과물 기준 아이템 ---
   {
     id: 'item-drink',
     name: '음료 제조',

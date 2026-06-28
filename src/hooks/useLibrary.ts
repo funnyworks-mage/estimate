@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import type { CostItem, CostPackage, EstimateProject } from '../types/estimate';
-import { StorageAPI } from '../utils/storage';
+import { StorageAPI, DEFAULT_COST_ITEMS } from '../utils/storage';
 
 export function useLibrary() {
   const [libraryItems, setLibraryItems] = useState<CostItem[]>([]);
@@ -353,6 +353,14 @@ export function useLibrary() {
     return { hrItems, designOutputItems, devOutputItems, productionOutputItems, otherOutputItems };
   }, [libraryItems]);
 
+  const handleResetToDefaultCostItems = async () => {
+    if (confirm('정말 사내 표준 단가표 프리셋(L1~L5 등급 완비 표준안)으로 단가 라이브러리를 초기화하시겠습니까?\n기존에 수정하거나 추가하셨던 모든 단가 정보는 덮어씌워집니다.')) {
+      setLibraryItems(DEFAULT_COST_ITEMS);
+      await StorageAPI.saveCostItems(DEFAULT_COST_ITEMS);
+      alert('사내 표준 단가표 프리셋으로 초기화가 완료되었습니다!');
+    }
+  };
+
   return {
     libraryItems,
     setLibraryItems,
@@ -380,6 +388,7 @@ export function useLibrary() {
     handleDeleteCostPackage,
     handleUpdateSettings,
     handleCategoryRename,
-    handleUnitRename
+    handleUnitRename,
+    handleResetToDefaultCostItems
   };
 }

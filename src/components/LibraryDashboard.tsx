@@ -30,7 +30,8 @@ export default function LibraryDashboard({
     handleDeleteHRGroup,
     handleUpdateSettings,
     handleCategoryRename,
-    handleUnitRename
+    handleUnitRename,
+    handleResetToDefaultCostItems
   } = libraryState;
 
   return (
@@ -41,6 +42,19 @@ export default function LibraryDashboard({
           <p className="workspace-subtitle">자주 반복되는 인건비 단가와 제품 단가를 저장하여 견적 오차를 제로화하세요.</p>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
+          <button 
+            type="button" 
+            className="btn btn-secondary" 
+            style={{ 
+              backgroundColor: '#fee2e2', 
+              color: '#dc2626', 
+              border: '1px solid rgba(220, 38, 38, 0.15)', 
+              fontWeight: '700' 
+            }}
+            onClick={handleResetToDefaultCostItems}
+          >
+            표준 단가표 초기화
+          </button>
           <button 
             type="button" 
             className="btn btn-primary" 
