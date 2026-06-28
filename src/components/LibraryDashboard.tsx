@@ -95,7 +95,11 @@ export default function LibraryDashboard({
                 'L2 Operator': 2,
                 'L3 Specialist': 3,
                 'L4 Lead': 4,
-                'L5 Director': 5
+                'L5 Director': 5,
+                '보조 스태프': 1,
+                '운영 스태프': 2,
+                '슈퍼바이저': 3,
+                '운영 PM': 4
               };
 
               // 정렬 처리

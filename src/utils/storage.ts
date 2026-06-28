@@ -371,15 +371,15 @@ export const DEFAULT_COST_ITEMS: CostItem[] = [
     internalMemo: 'L5 등급 QA 인력'
   },
 
-  // --- 6. 현장 스태프 인력 (L1 ~ L4) ---
+  // --- 6. 현장 스태프 인력 (보조 스태프, 운영 스태프, 슈퍼바이저, 운영 PM) ---
   {
     id: 'item-staff-l1',
     name: '현장 스태프 인력',
-    internalName: '현장 보조 스태프 (L1 Support)',
+    internalName: '현장 보조 스태프',
     category: '인건비 기준 (용역 공수)',
     unit: '일',
     defaultPrice: 100000,
-    rank: 'L1 Support',
+    rank: '보조 스태프',
     basePrice: 130000,
     formulaType: 'PEOPLE_x_DAYS_x_PRICE',
     vatType: 'TAX',
@@ -389,11 +389,11 @@ export const DEFAULT_COST_ITEMS: CostItem[] = [
   {
     id: 'item-staff-l2',
     name: '현장 스태프 인력',
-    internalName: '현장 운영 스태프 (L2 Operator)',
+    internalName: '현장 운영 스태프',
     category: '인건비 기준 (용역 공수)',
     unit: '일',
     defaultPrice: 130000,
-    rank: 'L2 Operator',
+    rank: '운영 스태프',
     basePrice: 130000,
     formulaType: 'PEOPLE_x_DAYS_x_PRICE',
     vatType: 'TAX',
@@ -403,11 +403,11 @@ export const DEFAULT_COST_ITEMS: CostItem[] = [
   {
     id: 'item-staff-l3',
     name: '현장 스태프 인력',
-    internalName: '현장 슈퍼바이저 (L3 Specialist)',
+    internalName: '현장 슈퍼바이저',
     category: '인건비 기준 (용역 공수)',
     unit: '일',
     defaultPrice: 250000,
-    rank: 'L3 Specialist',
+    rank: '슈퍼바이저',
     basePrice: 130000,
     formulaType: 'PEOPLE_x_DAYS_x_PRICE',
     vatType: 'TAX',
@@ -417,11 +417,11 @@ export const DEFAULT_COST_ITEMS: CostItem[] = [
   {
     id: 'item-staff-l4',
     name: '현장 스태프 인력',
-    internalName: '행사 운영 PM (L4 Lead)',
+    internalName: '행사 운영 PM',
     category: '인건비 기준 (용역 공수)',
     unit: '일',
     defaultPrice: 500000,
-    rank: 'L4 Lead',
+    rank: '운영 PM',
     basePrice: 130000,
     formulaType: 'PEOPLE_x_DAYS_x_PRICE',
     vatType: 'TAX',

@@ -99,19 +99,14 @@ export function HRGroupCard({ name, items, repItem, onEdit, onDeleteGroup }: HRG
           <div style={{ display: 'grid', gridTemplateColumns: `repeat(${items.length}, 1fr)`, gap: '6px' }}>
             {items.map((gi) => {
               const shortRank = gi.rank 
-                ? gi.rank
-                    .replace(' Support', '')
-                    .replace(' Operator', '')
-                    .replace(' Specialist', '')
-                    .replace(' Lead', '')
-                    .replace(' Director', '')
-                    .replace(' 스태프', '')
-                    .replace(' PM', '')
-                    .replace(' 실무보조', '보조')
-                    .replace(' 기본실무', '실무')
-                    .replace(' 전문수행', '전문')
-                    .replace(' 파트리더', '리더')
-                    .replace(' 총괄리더', '리더')
+                ? (['L1 Support', 'L2 Operator', 'L3 Specialist', 'L4 Lead', 'L5 Director'].includes(gi.rank)
+                    ? gi.rank
+                        .replace(' Support', '')
+                        .replace(' Operator', '')
+                        .replace(' Specialist', '')
+                        .replace(' Lead', '')
+                        .replace(' Director', '')
+                    : gi.rank)
                 : '';
                 
               const isBase = gi.basePrice && gi.basePrice > 0 
