@@ -367,7 +367,7 @@ export default function EstimatesDashboard({
 
               {activeSubTab === 'estimate' ? (
                  // (1) 견적 편집 화면 (좌우 flex 분할 레이아웃 적용)
-                 <div style={{ display: 'flex', gap: '24px', alignItems: 'flex-start' }}>
+                 <div className="no-print" style={{ display: 'flex', gap: '24px', alignItems: 'flex-start' }}>
                    {/* 좌측 폼 영역 */}
                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '24px' }}>
                   {/* 기본 메타 정보 입력 카드 */}
