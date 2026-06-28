@@ -404,7 +404,8 @@ export const StorageAPI = {
   // --- Projects (견적 프로젝트) CRUD ---
   async getProjects(): Promise<EstimateProject[]> {
     let projects: EstimateProject[] = [];
-    let loaded = false;
+    let isDbReadSuccess = false;
+    let dbProjects: EstimateProject[] = [];
 
     if (await checkSupabaseAccess()) {
       try {
@@ -413,21 +414,38 @@ export const StorageAPI = {
           .select('*')
           .order('created_at', { ascending: false });
         if (!error && data) {
-          projects = data as EstimateProject[];
-          loaded = true;
+          dbProjects = data as EstimateProject[];
+          isDbReadSuccess = true;
         }
       } catch (e) {
         console.warn('[Supabase] getProjects network error:', e);
       }
     }
     
-    if (!loaded) {
-      const data = localStorage.getItem(KEYS.PROJECTS);
-      if (!data) {
-        await this.saveProjects(DEFAULT_PROJECTS);
-        return DEFAULT_PROJECTS;
+    const localData = localStorage.getItem(KEYS.PROJECTS);
+    const localProjects = localData ? JSON.parse(localData) as EstimateProject[] : [];
+
+    if (isDbReadSuccess) {
+      if (dbProjects.length > 0) {
+        projects = dbProjects;
+        localStorage.setItem(KEYS.PROJECTS, JSON.stringify(dbProjects));
+      } else {
+        if (localProjects.length > 0) {
+          projects = localProjects;
+          this.saveProjects(localProjects);
+        } else {
+          projects = DEFAULT_PROJECTS;
+          localStorage.setItem(KEYS.PROJECTS, JSON.stringify(DEFAULT_PROJECTS));
+          this.saveProjects(DEFAULT_PROJECTS);
+        }
       }
-      projects = JSON.parse(data);
+    } else {
+      if (localProjects.length > 0) {
+        projects = localProjects;
+      } else {
+        projects = DEFAULT_PROJECTS;
+        localStorage.setItem(KEYS.PROJECTS, JSON.stringify(DEFAULT_PROJECTS));
+      }
     }
 
     // WBS 더미 데이터 자가 정화(Clean-up) 엔진
@@ -554,7 +572,8 @@ export const StorageAPI = {
   // --- Clients (고객사 주소록) CRUD ---
   async getClients(): Promise<ClientInfo[]> {
     let clients: ClientInfo[] = [];
-    let loaded = false;
+    let isDbReadSuccess = false;
+    let dbClients: ClientInfo[] = [];
 
     if (await checkSupabaseAccess()) {
       try {
@@ -563,21 +582,38 @@ export const StorageAPI = {
           .select('*')
           .order('name', { ascending: true });
         if (!error && data) {
-          clients = data as ClientInfo[];
-          loaded = true;
+          dbClients = data as ClientInfo[];
+          isDbReadSuccess = true;
         }
       } catch (e) {
         console.warn('[Supabase] getClients network error:', e);
       }
     }
 
-    if (!loaded) {
-      const data = localStorage.getItem(KEYS.CLIENTS);
-      if (!data) {
-        await this.saveClients(DEFAULT_CLIENTS);
-        return DEFAULT_CLIENTS;
+    const localData = localStorage.getItem(KEYS.CLIENTS);
+    const localClients = localData ? JSON.parse(localData) as ClientInfo[] : [];
+
+    if (isDbReadSuccess) {
+      if (dbClients.length > 0) {
+        clients = dbClients;
+        localStorage.setItem(KEYS.CLIENTS, JSON.stringify(dbClients));
+      } else {
+        if (localClients.length > 0) {
+          clients = localClients;
+          this.saveClients(localClients);
+        } else {
+          clients = DEFAULT_CLIENTS;
+          localStorage.setItem(KEYS.CLIENTS, JSON.stringify(DEFAULT_CLIENTS));
+          this.saveClients(DEFAULT_CLIENTS);
+        }
       }
-      clients = JSON.parse(data);
+    } else {
+      if (localClients.length > 0) {
+        clients = localClients;
+      } else {
+        clients = DEFAULT_CLIENTS;
+        localStorage.setItem(KEYS.CLIENTS, JSON.stringify(DEFAULT_CLIENTS));
+      }
     }
     return clients;
   },
@@ -639,7 +675,8 @@ export const StorageAPI = {
   // --- DailyReports (일일 업무 보고서) CRUD ---
   async getDailyReports(): Promise<DailyReport[]> {
     let reports: DailyReport[] = [];
-    let loaded = false;
+    let isDbReadSuccess = false;
+    let dbReports: DailyReport[] = [];
 
     if (await checkSupabaseAccess()) {
       try {
@@ -648,8 +685,7 @@ export const StorageAPI = {
           .select('*')
           .order('report_date', { ascending: false });
         if (!error && data) {
-          // DB snake_case -> FE camelCase 매핑 변환
-          reports = data.map((r: any) => ({
+          dbReports = data.map((r: any) => ({
             id: r.id,
             reportDate: r.report_date,
             title: r.title,
@@ -657,18 +693,28 @@ export const StorageAPI = {
             createdAt: r.created_at,
             createdBy: r.created_by
           })) as DailyReport[];
-          loaded = true;
+          isDbReadSuccess = true;
         }
       } catch (e) {
         console.warn('[Supabase] getDailyReports network error:', e);
       }
     }
 
-    if (!loaded) {
-      const data = localStorage.getItem(KEYS.DAILY_REPORTS);
-      if (data) {
-        reports = JSON.parse(data);
+    const localData = localStorage.getItem(KEYS.DAILY_REPORTS);
+    const localReports = localData ? JSON.parse(localData) as DailyReport[] : [];
+
+    if (isDbReadSuccess) {
+      if (dbReports.length > 0) {
+        reports = dbReports;
+        localStorage.setItem(KEYS.DAILY_REPORTS, JSON.stringify(dbReports));
+      } else {
+        if (localReports.length > 0) {
+          reports = localReports;
+          localReports.forEach(r => this.saveDailyReport(r));
+        }
       }
+    } else {
+      reports = localReports;
     }
     return reports;
   },
@@ -730,7 +776,8 @@ export const StorageAPI = {
   // --- CostItems (사내 기준 단가표) CRUD ---
   async getCostItems(): Promise<CostItem[]> {
     let items: CostItem[] = [];
-    let loadedFromSupabase = false;
+    let isDbReadSuccess = false;
+    let dbItems: CostItem[] = [];
 
     if (await checkSupabaseAccess()) {
       try {
@@ -739,28 +786,38 @@ export const StorageAPI = {
           .select('*')
           .order('created_at', { ascending: false });
         if (!error && data) {
-          items = data as CostItem[];
-          if (items.length > 0) {
-            loadedFromSupabase = true;
-          } else {
-            console.log('[Supabase] cost_items 테이블이 비어 있어 로컬 기본값을 제공하고 DB에 초기 등록을 진행합니다.');
-            loadedFromSupabase = false;
-          }
-        } else {
-          console.warn('[Supabase] getCostItems error:', error);
+          dbItems = data as CostItem[];
+          isDbReadSuccess = true;
         }
       } catch (e) {
         console.warn('[Supabase] getCostItems network error:', e);
       }
     }
 
-    if (!loadedFromSupabase) {
-      const data = localStorage.getItem(KEYS.COST_ITEMS);
-      if (!data) {
-        await this.saveCostItems(DEFAULT_COST_ITEMS);
-        return DEFAULT_COST_ITEMS;
+    const localData = localStorage.getItem(KEYS.COST_ITEMS);
+    const localItems = localData ? JSON.parse(localData) as CostItem[] : [];
+
+    if (isDbReadSuccess) {
+      if (dbItems.length > 0) {
+        items = dbItems;
+        localStorage.setItem(KEYS.COST_ITEMS, JSON.stringify(dbItems));
+      } else {
+        if (localItems.length > 0) {
+          items = localItems;
+          this.saveCostItems(localItems);
+        } else {
+          items = DEFAULT_COST_ITEMS;
+          localStorage.setItem(KEYS.COST_ITEMS, JSON.stringify(DEFAULT_COST_ITEMS));
+          this.saveCostItems(DEFAULT_COST_ITEMS);
+        }
       }
-      items = JSON.parse(data) as CostItem[];
+    } else {
+      if (localItems.length > 0) {
+        items = localItems;
+      } else {
+        items = DEFAULT_COST_ITEMS;
+        localStorage.setItem(KEYS.COST_ITEMS, JSON.stringify(DEFAULT_COST_ITEMS));
+      }
     }
     
     // 구버전 데이터 마이그레이션 보정 엔진
@@ -922,7 +979,7 @@ export const StorageAPI = {
       return item;
     });
 
-    const finalNeedsUpdate = needsUpdate || loadedFromSupabase || hadDuplicates || hasRecoveredL2;
+    const finalNeedsUpdate = needsUpdate || isDbReadSuccess || hadDuplicates || hasRecoveredL2;
 
     if (finalNeedsUpdate) {
       // 로컬 스토리지 상시 갱신
