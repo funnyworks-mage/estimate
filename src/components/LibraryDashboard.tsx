@@ -85,7 +85,10 @@ export default function LibraryDashboard({
                 '보조 스태프': 1,
                 '운영 스태프': 2,
                 '슈퍼바이저': 3,
-                '운영 PM': 4
+                '운영 PM': 4,
+                '테스터': 1,
+                '엔지니어': 2,
+                '리드': 3
               };
 
               // 정렬 처리
@@ -101,7 +104,11 @@ export default function LibraryDashboard({
                 <>
                   {Object.keys(groups).map(name => {
                     const group = groups[name];
-                    const repItem = group.find(g => g.rank === 'L2 Operator') || group[0];
+                    const repItem = group.find(g => 
+                      g.rank === 'L2 Operator' || 
+                      g.rank === '엔지니어' || 
+                      g.rank === '운영 스태프'
+                    ) || group[0];
                     return (
                       <HRGroupCard 
                         key={name}

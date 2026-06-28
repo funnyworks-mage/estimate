@@ -362,76 +362,48 @@ export const DEFAULT_COST_ITEMS: CostItem[] = [
     internalMemo: 'L5 등급 BE 개발 인력'
   },
 
-  // --- 5. QA 검증 인력 (L1 ~ L5) ---
+  // --- 5. QA 검증 인력 (테스터, 엔지니어, 리드) ---
   {
     id: 'item-qa-l1',
     name: 'QA 검증 인력',
-    internalName: 'QA 검증 인력 (L1 Support)',
+    internalName: 'QA 검증 인력 (테스터)',
     category: '인건비 기준 (용역 공수)',
     unit: 'MD',
-    defaultPrice: 320000,
-    rank: 'L1 Support',
-    basePrice: 400000,
+    defaultPrice: 200000,
+    rank: '테스터',
+    basePrice: 250000,
     formulaType: 'PEOPLE_x_DAYS_x_PRICE',
     vatType: 'TAX',
-    description: '단순 테스트 케이스 수행 및 결과 기록',
-    internalMemo: 'L1 등급 QA 인력'
+    description: '단순 테스트 수행 및 단순 버그 리포팅',
+    internalMemo: 'QA 테스터 인력'
   },
   {
     id: 'item-qa-l2',
     name: 'QA 검증 인력',
-    internalName: 'QA 검증 인력 (L2 Operator)',
+    internalName: 'QA 검증 인력 (엔지니어)',
     category: '인건비 기준 (용역 공수)',
     unit: 'MD',
-    defaultPrice: 400000,
-    rank: 'L2 Operator',
-    basePrice: 400000,
+    defaultPrice: 250000,
+    rank: '엔지니어',
+    basePrice: 250000,
     formulaType: 'PEOPLE_x_DAYS_x_PRICE',
     vatType: 'TAX',
-    description: '테스트 시나리오 작성 및 기능 검증 테스트',
-    internalMemo: 'L2 등급 QA 인력 (기준 단가)'
+    description: 'TC 설계, 정밀 검증 및 기술 실무 수행',
+    internalMemo: 'QA 엔지니어 인력 (기준 단가)'
   },
   {
     id: 'item-qa-l3',
     name: 'QA 검증 인력',
-    internalName: 'QA 검증 인력 (L3 Specialist)',
+    internalName: 'QA 검증 인력 (리드)',
     category: '인건비 기준 (용역 공수)',
     unit: 'MD',
-    defaultPrice: 600000,
-    rank: 'L3 Specialist',
-    basePrice: 400000,
+    defaultPrice: 450000,
+    rank: '리드',
+    basePrice: 250000,
     formulaType: 'PEOPLE_x_DAYS_x_PRICE',
     vatType: 'TAX',
-    description: '검증 계획 수립, 회귀 테스트 및 버그 리포트 관리',
-    internalMemo: 'L3 등급 QA 인력'
-  },
-  {
-    id: 'item-qa-l4',
-    name: 'QA 검증 인력',
-    internalName: 'QA 검증 인력 (L4 Lead)',
-    category: '인건비 기준 (용역 공수)',
-    unit: 'MD',
-    defaultPrice: 800000,
-    rank: 'L4 Lead',
-    basePrice: 400000,
-    formulaType: 'PEOPLE_x_DAYS_x_PRICE',
-    vatType: 'TAX',
-    description: 'QA 전략 설계, 검증 총괄 및 릴리즈 승인 리드',
-    internalMemo: 'L4 등급 QA 인력'
-  },
-  {
-    id: 'item-qa-l5',
-    name: 'QA 검증 인력',
-    internalName: 'QA 검증 인력 (L5 Director)',
-    category: '인건비 기준 (용역 공수)',
-    unit: 'MD',
-    defaultPrice: 1200000,
-    rank: 'L5 Director',
-    basePrice: 400000,
-    formulaType: 'PEOPLE_x_DAYS_x_PRICE',
-    vatType: 'TAX',
-    description: '품질 관리 및 검증 프로세스 총괄 디렉터',
-    internalMemo: 'L5 등급 QA 인력'
+    description: 'QA 전략 수립, 품질 리스크 매니지먼트 및 최종 승인',
+    internalMemo: 'QA 리드 인력'
   },
 
   // --- 6. 현장 스태프 인력 (보조 스태프, 운영 스태프, 슈퍼바이저, 운영 PM) ---
