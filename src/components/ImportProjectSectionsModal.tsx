@@ -63,7 +63,7 @@ export default function ImportProjectSectionsModal({
 
   return (
     <div className="modal-overlay" style={{ zIndex: 1100 }}>
-      <div className="modal-container" style={{ width: '800px', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
+      <div className="modal-container" style={{ width: '1000px', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
         
         {/* 모달 헤더 */}
         <div className="modal-header">
@@ -80,7 +80,7 @@ export default function ImportProjectSectionsModal({
         <div className="modal-body" style={{ display: 'flex', gap: '20px', padding: '20px', overflow: 'hidden', flexGrow: 1 }}>
           
           {/* 좌측: 견적서 목록 */}
-          <div style={{ width: '45%', borderRight: '1px solid var(--border-color)', paddingRight: '16px', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ width: '48%', borderRight: '1px solid var(--border-color)', paddingRight: '16px', display: 'flex', flexDirection: 'column' }}>
             <h3 style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-secondary)', marginBottom: '10px' }}>1. 가져올 대상 견적서 선택</h3>
             <div style={{ flexGrow: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '400px' }}>
               {targetProjects.length === 0 ? (
@@ -107,8 +107,15 @@ export default function ImportProjectSectionsModal({
                       transition: 'all 0.15s ease'
                     }}
                   >
-                    <div>
-                      <div style={{ fontSize: '12px', fontWeight: '700', color: proj.id === selectedTargetId ? 'var(--color-blue)' : 'var(--text-primary)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: '280px' }}>
+                    <div style={{ flexGrow: 1, paddingRight: '12px' }}>
+                      <div style={{ 
+                        fontSize: '12px', 
+                        fontWeight: '700', 
+                        color: proj.id === selectedTargetId ? 'var(--color-blue)' : 'var(--text-primary)', 
+                        whiteSpace: 'normal', 
+                        wordBreak: 'break-all',
+                        lineHeight: '1.4'
+                      }}>
                         {proj.title}
                       </div>
                       <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginTop: '4px' }}>
@@ -123,7 +130,7 @@ export default function ImportProjectSectionsModal({
           </div>
 
           {/* 우측: 선택한 견적서 내 섹션 목록 */}
-          <div style={{ width: '55%', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ width: '52%', display: 'flex', flexDirection: 'column' }}>
             <h3 style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-secondary)', marginBottom: '10px' }}>2. 가져올 구분 섹션 선택</h3>
             
             {!selectedTargetId ? (
