@@ -37,6 +37,7 @@ export default function App() {
   });
 
   const [isLoading, setIsLoading] = useState(true);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   // --- 사용자 표시 이름 동적 바인딩 헬퍼 ---
   const getUserDisplayName = (usr: any) => {
@@ -277,6 +278,8 @@ export default function App() {
         handleExportData={handleExportData}
         handleImportData={handleImportData}
         onLogout={handleLogout}
+        isCollapsed={isSidebarCollapsed}
+        onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
       />
 
       {/* 우측 도메인별 메인 워크스페이스 컨텐츠 영역 */}
