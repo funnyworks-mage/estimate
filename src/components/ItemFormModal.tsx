@@ -692,12 +692,24 @@ export default function ItemFormModal({
                 )}
 
                 <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '8px', lineHeight: '1.5', backgroundColor: 'var(--bg-secondary)', padding: '10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)' }}>
-                  <div style={{ fontWeight: 'bold', marginBottom: '4px', color: 'var(--text-secondary)' }}>[{activePreset.name} 레벨 기준]</div>
-                  {activePreset.ranks.map(r => (
-                    <div key={r.name} style={{ marginBottom: '2px' }}>
-                      • <strong>{r.name}</strong> ({r.multiplier}x): {r.description}
-                    </div>
-                  ))}
+                  <div style={{ fontWeight: 'bold', marginBottom: '6px', color: 'var(--text-secondary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span>[{activePreset.name} 레벨 기준]</span>
+                    <span style={{ fontSize: '10px', color: 'var(--color-blue)', fontWeight: 'normal' }}>* 기준 단가 입력 시 실시간 환산 적용</span>
+                  </div>
+                  {activePreset.ranks.map(r => {
+                    const calculatedPrice = Math.round(defaultPrice * r.multiplier);
+                    return (
+                      <div key={r.name} style={{ marginBottom: '4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px dashed var(--border-color)', paddingBottom: '3px' }}>
+                        <span>
+                          • <strong>{r.name}</strong> ({r.multiplier}x)
+                          <span style={{ color: 'var(--text-tertiary)', marginLeft: '6px', fontSize: '10px' }}>- {r.description}</span>
+                        </span>
+                        <span style={{ fontWeight: '700', color: 'var(--color-blue)', fontSize: '12px' }}>
+                          ₩{calculatedPrice.toLocaleString()}원
+                        </span>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             ) : (
