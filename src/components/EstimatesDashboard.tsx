@@ -93,9 +93,17 @@ export default function EstimatesDashboard({
       if (dateA !== dateB) {
         return dateB.localeCompare(dateA);
       }
-      const createdA = new Date(a.createdAt || 0).getTime();
-      const createdB = new Date(b.createdAt || 0).getTime();
-      return createdB - createdA;
+      
+      const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      const validA = isNaN(timeA) ? 0 : timeA;
+      const validB = isNaN(timeB) ? 0 : timeB;
+      
+      if (validA !== validB) {
+        return validB - validA;
+      }
+      
+      return b.id.localeCompare(a.id);
     });
   }, [projects, searchTerm, statusFilter, projectTypeFilter]);
 
@@ -167,15 +175,19 @@ export default function EstimatesDashboard({
               const finalVat = isForeign ? 0 : (corrRate !== 0 ? Math.floor(finalSupply * 0.1) : projVat);
               const finalGrand = finalSupply + finalVat;
 
-              // 통화 심볼 빌더
-              const currencySymbol = isForeign ? (proj.foreignCurrency === 'EUR' ? '€' : '$') : '₩';
-              const formattedFinalGrand = isForeign 
-                ? (finalGrand / (proj.exchangeRate || 1)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-                : finalGrand.toLocaleString();
+              // 원화 포맷팅 문자열 생성 (카드에서 항상 기준이 됨)
+              const rawOrigGrandInKRW = projSupply + projVat;
+              const origGrandKrwStr = `₩${rawOrigGrandInKRW.toLocaleString()}`;
+              const finalGrandKrwStr = `₩${finalGrand.toLocaleString()}`;
 
-              const formattedOrigGrand = isForeign
-                ? ((projSupply + projVat) / (proj.exchangeRate || 1)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-                : (projSupply + projVat).toLocaleString();
+              // 외화 포맷팅 문자열 생성
+              const foreignSymbol = proj.foreignCurrency === 'EUR' ? '€' : '$';
+              const foreignOrigGrandStr = isForeign
+                ? `${foreignSymbol}${((projSupply + projVat) / (proj.exchangeRate || 1)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                : '';
+              const foreignFinalGrandStr = isForeign
+                ? `${foreignSymbol}${(finalGrand / (proj.exchangeRate || 1)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                : '';
 
               // 카드 클릭 시 진입
               return (
@@ -232,14 +244,27 @@ export default function EstimatesDashboard({
                   <div>
                     {/* 최종 금액 실시간 피드백 */}
                     <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '12px', marginBottom: '16px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--text-tertiary)', marginBottom: '4px' }}>
-                        <span>견적금액</span>
-                        <span>{currencySymbol}{formattedOrigGrand}</span>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--text-tertiary)', marginBottom: '4px', alignItems: 'center' }}>
+                        <span>견적금액 (원화)</span>
+                        <span style={{ fontWeight: '600' }}>{origGrandKrwStr}</span>
                       </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: '700', color: 'var(--color-blue)' }}>
+                      {isForeign && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'var(--text-secondary)', marginBottom: '6px', paddingLeft: '8px' }}>
+                          <span>ㄴ 외화 환산액</span>
+                          <span>{foreignOrigGrandStr}</span>
+                        </div>
+                      )}
+                      
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: '700', color: 'var(--color-blue)', alignItems: 'center' }}>
                         <span>청구금액</span>
-                        <span>{currencySymbol}{formattedFinalGrand}</span>
+                        <span>{finalGrandKrwStr}</span>
                       </div>
+                      {isForeign && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--color-blue)', fontWeight: '600', paddingLeft: '8px', marginTop: '2px' }}>
+                          <span>ㄴ 외화 청구액</span>
+                          <span>{foreignFinalGrandStr}</span>
+                        </div>
+                      )}
                     </div>
 
                     <div className="library-card-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
