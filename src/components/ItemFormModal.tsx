@@ -775,21 +775,33 @@ export default function ItemFormModal({
             </div>
           </div>
 
-          {/* 일괄 저장 모드일 때 등급별 추천 단가 실시간 미리보기 테이블 */}
-          {isHR && isBulkRank && defaultPrice > 0 && (
+          {/* 인건비 기준 단가 입력 시 등급별 실시간 가격 환산 미리보기 테이블 (저장 모드와 무관하게 상시 노출) */}
+          {isHR && defaultPrice > 0 && activePreset.ranks.length > 0 && (
             <div style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', padding: '12px 16px', backgroundColor: 'var(--bg-secondary)', marginTop: '4px', marginBottom: '12px' }}>
               <div style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--text-secondary)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                📊 레벨별 자동 계산 단가 미리보기
+                📊 {activePreset.name} 실시간 요율 단가 미리보기
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: `repeat(${activePreset.ranks.length}, 1fr)`, gap: '8px', textAlign: 'center' }}>
                 {activePreset.ranks.map((r) => {
-                  const mult = r.multiplier;
-                  const calculated = Math.ceil((defaultPrice * mult) / 10000) * 10000;
+                  const calculated = Math.round(defaultPrice * r.multiplier);
+                  // 현재 단일 수정 모드일 때 선택된 등급과 일치하면 하이라이팅
+                  const isCurrentRank = !isBulkRank && rank === r.name;
                   return (
-                    <div key={r.name} style={{ backgroundColor: '#ffffff', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', padding: '8px 4px' }}>
-                      <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--color-blue)' }}>{r.name}</div>
-                      <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', margin: '2px 0' }}>{mult}x</div>
-                      <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-secondary)' }}>₩{calculated.toLocaleString()}</div>
+                    <div 
+                      key={r.name} 
+                      style={{ 
+                        backgroundColor: isCurrentRank ? 'var(--color-blue-light)' : '#ffffff', 
+                        border: isCurrentRank ? '1px solid var(--color-blue)' : '1px solid var(--border-color)', 
+                        borderRadius: 'var(--radius-sm)', 
+                        padding: '8px 4px',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      <div style={{ fontSize: '11px', fontWeight: '700', color: isCurrentRank ? 'var(--color-blue)' : 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.name}>
+                        {r.name}
+                      </div>
+                      <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', margin: '2px 0' }}>{r.multiplier}x</div>
+                      <div style={{ fontSize: '12px', fontWeight: '700', color: isCurrentRank ? 'var(--color-blue)' : 'var(--text-secondary)' }}>₩{calculated.toLocaleString()}</div>
                     </div>
                   );
                 })}
