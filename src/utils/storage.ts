@@ -299,57 +299,137 @@ export const DEFAULT_COST_ITEMS: CostItem[] = [
     internalMemo: 'L5 등급 BE 개발 인력'
   },
 
-  // --- 5. 현장 스태프 인력들 ---
+  // --- 5. QA 검증 인력 (L1 ~ L5) ---
   {
-    id: 'item-staff-helper',
-    name: '현장 보조 스태프',
-    internalName: '현장 보조 스태프',
+    id: 'item-qa-l1',
+    name: 'QA 검증 인력',
+    internalName: 'QA 검증 인력 (L1 Support)',
+    category: '인건비 기준 (용역 공수)',
+    unit: 'MD',
+    defaultPrice: 320000,
+    rank: 'L1 Support',
+    basePrice: 400000,
+    formulaType: 'PEOPLE_x_DAYS_x_PRICE',
+    vatType: 'TAX',
+    description: '단순 테스트 케이스 수행 및 결과 기록',
+    internalMemo: 'L1 등급 QA 인력'
+  },
+  {
+    id: 'item-qa-l2',
+    name: 'QA 검증 인력',
+    internalName: 'QA 검증 인력 (L2 Operator)',
+    category: '인건비 기준 (용역 공수)',
+    unit: 'MD',
+    defaultPrice: 400000,
+    rank: 'L2 Operator',
+    basePrice: 400000,
+    formulaType: 'PEOPLE_x_DAYS_x_PRICE',
+    vatType: 'TAX',
+    description: '테스트 시나리오 작성 및 기능 검증 테스트',
+    internalMemo: 'L2 등급 QA 인력 (기준 단가)'
+  },
+  {
+    id: 'item-qa-l3',
+    name: 'QA 검증 인력',
+    internalName: 'QA 검증 인력 (L3 Specialist)',
+    category: '인건비 기준 (용역 공수)',
+    unit: 'MD',
+    defaultPrice: 600000,
+    rank: 'L3 Specialist',
+    basePrice: 400000,
+    formulaType: 'PEOPLE_x_DAYS_x_PRICE',
+    vatType: 'TAX',
+    description: '검증 계획 수립, 회귀 테스트 및 버그 리포트 관리',
+    internalMemo: 'L3 등급 QA 인력'
+  },
+  {
+    id: 'item-qa-l4',
+    name: 'QA 검증 인력',
+    internalName: 'QA 검증 인력 (L4 Lead)',
+    category: '인건비 기준 (용역 공수)',
+    unit: 'MD',
+    defaultPrice: 800000,
+    rank: 'L4 Lead',
+    basePrice: 400000,
+    formulaType: 'PEOPLE_x_DAYS_x_PRICE',
+    vatType: 'TAX',
+    description: 'QA 전략 설계, 검증 총괄 및 릴리즈 승인 리드',
+    internalMemo: 'L4 등급 QA 인력'
+  },
+  {
+    id: 'item-qa-l5',
+    name: 'QA 검증 인력',
+    internalName: 'QA 검증 인력 (L5 Director)',
+    category: '인건비 기준 (용역 공수)',
+    unit: 'MD',
+    defaultPrice: 1200000,
+    rank: 'L5 Director',
+    basePrice: 400000,
+    formulaType: 'PEOPLE_x_DAYS_x_PRICE',
+    vatType: 'TAX',
+    description: '품질 관리 및 검증 프로세스 총괄 디렉터',
+    internalMemo: 'L5 등급 QA 인력'
+  },
+
+  // --- 6. 현장 스태프 인력 (L1 ~ L4) ---
+  {
+    id: 'item-staff-l1',
+    name: '현장 스태프 인력',
+    internalName: '현장 보조 스태프 (L1 Support)',
     category: '인건비 기준 (용역 공수)',
     unit: '일',
     defaultPrice: 100000,
+    rank: 'L1 Support',
+    basePrice: 130000,
     formulaType: 'PEOPLE_x_DAYS_x_PRICE',
     vatType: 'TAX',
     description: '단순 현장 보조, 등록 및 대기 업무',
-    internalMemo: '단순 현장 스태프 기준'
+    internalMemo: '현장 보조 스태프'
   },
   {
-    id: 'item-staff-operator',
-    name: '현장 운영 스태프',
-    internalName: '현장 운영 스태프',
+    id: 'item-staff-l2',
+    name: '현장 스태프 인력',
+    internalName: '현장 운영 스태프 (L2 Operator)',
     category: '인건비 기준 (용역 공수)',
     unit: '일',
     defaultPrice: 130000,
+    rank: 'L2 Operator',
+    basePrice: 130000,
     formulaType: 'PEOPLE_x_DAYS_x_PRICE',
     vatType: 'TAX',
     description: '현장 안내, 부스 운영 및 실무 수행',
-    internalMemo: '숙련 현장 스태프 기준'
+    internalMemo: '현장 운영 스태프 (기준 단가)'
   },
   {
-    id: 'item-staff-supervisor',
-    name: '현장 슈퍼바이저',
-    internalName: '현장 슈퍼바이저',
+    id: 'item-staff-l3',
+    name: '현장 스태프 인력',
+    internalName: '현장 슈퍼바이저 (L3 Specialist)',
     category: '인건비 기준 (용역 공수)',
     unit: '일',
     defaultPrice: 250000,
+    rank: 'L3 Specialist',
+    basePrice: 130000,
     formulaType: 'PEOPLE_x_DAYS_x_PRICE',
     vatType: 'TAX',
     description: '현장 인력 관리, 일정 및 품질 총괄 관리',
-    internalMemo: '현장 감독 및 리더 기준'
+    internalMemo: '현장 슈퍼바이저'
   },
   {
-    id: 'item-staff-pm',
-    name: '행사 운영 PM',
-    internalName: '행사 운영 PM',
+    id: 'item-staff-l4',
+    name: '현장 스태프 인력',
+    internalName: '행사 운영 PM (L4 Lead)',
     category: '인건비 기준 (용역 공수)',
-    unit: 'MD',
+    unit: '일',
     defaultPrice: 500000,
+    rank: 'L4 Lead',
+    basePrice: 130000,
     formulaType: 'PEOPLE_x_DAYS_x_PRICE',
     vatType: 'TAX',
     description: '행사 총괄 기획 및 클라이언트 최종 커뮤니케이션',
-    internalMemo: '프로젝트 총괄 PM 기준'
+    internalMemo: '행사 운영 PM'
   },
 
-  // --- 6. 기타/디자인 결과물 기준 아이템 ---
+  // --- 7. 기타 결과물 기준 아이템 ---
   {
     id: 'item-drink',
     name: '음료 제조',
@@ -421,8 +501,8 @@ const DEFAULT_COST_PACKAGES: CostPackage[] = [
     items: [
       { itemId: 'item-drink', defaultQuantity: 900 },
       { itemId: 'item-cupcake', defaultQuantity: 600 },
-      { itemId: 'item-pm', defaultQuantity: 0, defaultPeople: 1, defaultDays: 3 }, // 인원 1명 * 3일 = 3MD 자동 유도
-      { itemId: 'item-staff-operator', defaultQuantity: 0, defaultPeople: 15, defaultDays: 3 }
+      { itemId: 'item-pm-l2', defaultQuantity: 0, defaultPeople: 1, defaultDays: 3 },
+      { itemId: 'item-staff-l2', defaultQuantity: 0, defaultPeople: 15, defaultDays: 3 }
     ]
   },
   {
@@ -1089,7 +1169,14 @@ export const StorageAPI = {
         needsUpdate = true;
       }
       
-      if (['item-pm', 'item-designer', 'item-fe', 'item-be'].includes(currentItem.id) && currentItem.unit !== 'MD') {
+      if (
+        (currentItem.id.startsWith('item-pm-') || 
+         currentItem.id.startsWith('item-designer-') || 
+         currentItem.id.startsWith('item-fe-') || 
+         currentItem.id.startsWith('item-be-') || 
+         currentItem.id.startsWith('item-qa-')) && 
+        currentItem.unit !== 'MD'
+      ) {
         currentItem.unit = 'MD';
         currentItem.formulaType = 'PEOPLE_x_DAYS_x_PRICE';
         needsUpdate = true;
