@@ -207,6 +207,16 @@ export function exportProjectToExcel(project: EstimateProject, libraryItems: Cos
   // 5. 시트 객체로 변환
   const ws = XLSX.utils.aoa_to_sheet(aoa);
   ws['!merges'] = merges;
+
+  // A1부터 I{currentRow} 범위 내의 모든 빈 셀 객체를 강제로 생성하여 스타일 누락(11pt 오동작) 차단
+  for (let r = 0; r < currentRow; r++) {
+    for (let c = 0; c < 9; c++) {
+      const cellRef = encodeCell(r, c);
+      if (!ws[cellRef]) {
+        ws[cellRef] = { v: '', t: 's' };
+      }
+    }
+  }
   
   // 6. 테두리 및 폰트 9pt 일괄 주입 스타일링 엔진
   const commonFont = { name: '맑은 고딕', size: 9 };
