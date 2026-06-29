@@ -100,6 +100,17 @@ export default function App() {
     // [무적의 마스터 가드] 마스터 이메일은 즉시 슈퍼관리자 권한을 강제 부여하여 DB/RLS 장벽을 우회합니다.
     if (isMasterEmail) {
       setUserRole('super_admin');
+      try {
+        await supabase
+          .from('user_profiles')
+          .upsert({
+            id: userId,
+            email: email,
+            role: 'super_admin'
+          });
+      } catch (dbErr) {
+        console.error('마스터 권한 DB 동기화 실패:', dbErr);
+      }
       setIsLoading(false);
       return;
     }
