@@ -28,6 +28,8 @@ export function useEstimateProjects({ user, libraryItems }: UseEstimateProjectsP
 
   // --- 초기 프로젝트 데이터 로드 및 정밀 마이그레이션 ---
   useEffect(() => {
+    if (!user) return;
+
     async function loadProjects() {
       try {
         const projs = await StorageAPI.getProjects();
@@ -78,7 +80,7 @@ export function useEstimateProjects({ user, libraryItems }: UseEstimateProjectsP
       }
     }
     loadProjects();
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     setActiveSubTab('estimate');

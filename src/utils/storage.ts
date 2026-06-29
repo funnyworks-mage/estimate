@@ -747,11 +747,12 @@ export const StorageAPI = {
     if (!(await checkSupabaseAccess())) return;
 
     try {
-      let currentUserId: string | null = null;
       const { data: { session } } = await supabase.auth.getSession();
-      if (session && session.user) {
-        currentUserId = session.user.id;
+      if (!session || !session.user) {
+        console.log('[Rescue] No active session. Postponing migration...');
+        return;
       }
+      const currentUserId = session.user.id;
 
       // 1. 고객사 구출
       const localClientsData = localStorage.getItem('estimate_clients');
