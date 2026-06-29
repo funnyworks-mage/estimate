@@ -950,7 +950,7 @@ export const StorageAPI = {
         const { data, error } = await supabase
           .from('estimate_projects')
           .select('*')
-          .order('created_at', { ascending: false });
+          .order('id', { ascending: false });
         if (!error && data) {
           projects = data as EstimateProject[];
         } else if (error) {
