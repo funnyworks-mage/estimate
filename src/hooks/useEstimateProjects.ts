@@ -29,6 +29,21 @@ export function useEstimateProjects({ user, libraryItems }: UseEstimateProjectsP
 
   // --- 초기 프로젝트 데이터 로드 및 정밀 마이그레이션 ---
   useEffect(() => {
+    // [로컬 스토리지 찌꺼기 박멸] 모든 이전 로컬스토리지 데이터를 완전히 삭제하여 원천 방어!
+    const legacyKeys = [
+      'estimate_projects',
+      'estimate_clients',
+      'estimate_cost_items',
+      'estimate_cost_packages',
+      'estimate_daily_reports',
+      'estimate_vendor_info'
+    ];
+    legacyKeys.forEach(key => {
+      try {
+        localStorage.removeItem(key);
+      } catch (e) {}
+    });
+
     if (!user) return;
 
     async function loadProjects() {
