@@ -100,34 +100,6 @@ export default function App() {
     // [무적의 마스터 가드] 마스터 이메일은 즉시 슈퍼관리자 권한을 강제 부여하여 DB/RLS 장벽을 우회합니다.
     if (isMasterEmail) {
       setUserRole('super_admin');
-      try {
-        const { error } = await supabase
-          .from('user_profiles')
-          .upsert({
-            id: userId,
-            email: email,
-            role: 'super_admin'
-          });
-        if (error) {
-          const wantDownload = confirm(
-            `[권한 동기화 실패] user_profiles 테이블에 super_admin 역할을 반영하지 못했습니다.\n` +
-            `사유: ${error.message} (코드: ${error.code})\n\n` +
-            `★ 중요: 로컬스토리지에 들어있는 소중한 데이터를 PC 파일로 안전하게 즉시 백업(다운로드)하시겠습니까?`
-          );
-          if (wantDownload) {
-            StorageAPI.downloadEmergencyBackup();
-          }
-        }
-      } catch (dbErr: any) {
-        const wantDownload = confirm(
-          `[권한 동기화 예외] DB 통신 중 오류가 발생했습니다.\n` +
-          `사유: ${dbErr.message}\n\n` +
-          `★ 중요: 로컬스토리지에 들어있는 소중한 데이터를 PC 파일로 안전하게 즉시 백업(다운로드)하시겠습니까?`
-        );
-        if (wantDownload) {
-          StorageAPI.downloadEmergencyBackup();
-        }
-      }
       setIsLoading(false);
       return;
     }
