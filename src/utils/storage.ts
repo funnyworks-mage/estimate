@@ -1678,7 +1678,9 @@ export const StorageAPI = {
         `- 거래처(clients): ${parsed.clients ? parsed.clients.length : 0}개\n` +
         `- 단가항목(costItems): ${parsed.costItems ? parsed.costItems.length : 0}개\n` +
         `- 일일보고서(dailyReports): ${parsed.dailyReports ? parsed.dailyReports.length : 0}개\n` +
-        `- 패키지(costPackages): ${parsed.costPackages ? parsed.costPackages.length : 0}개`
+        `- 패키지(costPackages): ${parsed.costPackages ? parsed.costPackages.length : 0}개\n\n` +
+        `★ 업로드된 파일의 최상위 키 목록:\n` +
+        `${Object.keys(parsed).slice(0, 10).join(', ')}${Object.keys(parsed).length > 10 ? ' ... 외' : ''}`
       );
 
       const errors: string[] = [];
