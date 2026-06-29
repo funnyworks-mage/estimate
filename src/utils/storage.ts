@@ -740,22 +740,10 @@ export function calculateRowAmounts(row: Omit<EstimateRow, 'supplyPrice' | 'vat'
 
 // --- LocalStorage API ---
 
-const KEYS = {
-  PROJECTS: 'estimate_projects',
-  COST_ITEMS: 'estimate_cost_items',
-  COST_PACKAGES: 'estimate_cost_packages',
-  VENDOR_INFO: 'estimate_vendor_info',
-  SETTINGS: 'estimate_settings',
-  CLIENTS: 'estimate_clients',
-  DAILY_REPORTS: 'estimate_daily_reports'
-};
-
 export const StorageAPI = {
   // --- Projects (견적 프로젝트) CRUD ---
   async getProjects(): Promise<EstimateProject[]> {
     let projects: EstimateProject[] = [];
-    let isDbReadSuccess = false;
-    let dbProjects: EstimateProject[] = [];
 
     if (await checkSupabaseAccess()) {
       try {
@@ -764,38 +752,17 @@ export const StorageAPI = {
           .select('*')
           .order('created_at', { ascending: false });
         if (!error && data) {
-          dbProjects = data as EstimateProject[];
-          isDbReadSuccess = true;
+          projects = data as EstimateProject[];
+        } else if (error) {
+          console.warn('[Supabase] getProjects error:', error);
         }
       } catch (e) {
         console.warn('[Supabase] getProjects network error:', e);
       }
     }
     
-    const localData = localStorage.getItem(KEYS.PROJECTS);
-    const localProjects = localData ? JSON.parse(localData) as EstimateProject[] : [];
-
-    if (isDbReadSuccess) {
-      if (dbProjects.length > 0) {
-        projects = dbProjects;
-        localStorage.setItem(KEYS.PROJECTS, JSON.stringify(dbProjects));
-      } else {
-        if (localProjects.length > 0) {
-          projects = localProjects;
-          this.saveProjects(localProjects);
-        } else {
-          projects = DEFAULT_PROJECTS;
-          localStorage.setItem(KEYS.PROJECTS, JSON.stringify(DEFAULT_PROJECTS));
-          this.saveProjects(DEFAULT_PROJECTS);
-        }
-      }
-    } else {
-      if (localProjects.length > 0) {
-        projects = localProjects;
-      } else {
-        projects = DEFAULT_PROJECTS;
-        localStorage.setItem(KEYS.PROJECTS, JSON.stringify(DEFAULT_PROJECTS));
-      }
+    if (projects.length === 0) {
+      projects = DEFAULT_PROJECTS;
     }
 
     // WBS 더미 데이터 자가 정화(Clean-up) 엔진
@@ -848,12 +815,12 @@ export const StorageAPI = {
       return proj;
     });
 
-    if (needsSave) {
-      localStorage.setItem(KEYS.PROJECTS, JSON.stringify(cleanedProjects));
-      if (await checkSupabaseAccess()) {
-        supabase.from('estimate_projects').upsert(cleanedProjects).then(({ error }) => {
-          if (error) console.warn('[Supabase] auto-clean upsert error:', error);
-        });
+    if (needsSave && (await checkSupabaseAccess())) {
+      try {
+        const { error } = await supabase.from('estimate_projects').upsert(cleanedProjects);
+        if (error) console.warn('[Supabase] auto-clean upsert error:', error);
+      } catch (e) {
+        console.warn('[Supabase] auto-clean upsert network error:', e);
       }
     }
 
@@ -861,15 +828,18 @@ export const StorageAPI = {
   },
 
   async saveProjects(projects: EstimateProject[]): Promise<void> {
-    localStorage.setItem(KEYS.PROJECTS, JSON.stringify(projects));
     if (await checkSupabaseAccess()) {
       try {
         const { error } = await supabase
           .from('estimate_projects')
           .upsert(projects);
-        if (error) console.warn('[Supabase] saveProjects error:', error);
-      } catch (e) {
+        if (error) {
+          console.warn('[Supabase] saveProjects error:', error);
+          throw new Error(error.message);
+        }
+      } catch (e: any) {
         console.warn('[Supabase] saveProjects network error:', e);
+        throw e;
       }
     }
   },
@@ -880,41 +850,36 @@ export const StorageAPI = {
   },
 
   async saveProject(project: EstimateProject): Promise<void> {
-    const projects = await this.getProjects();
-    const idx = projects.findIndex(p => p.id === project.id);
-    if (idx > -1) {
-      projects[idx] = project;
-    } else {
-      projects.push(project);
-    }
-    localStorage.setItem(KEYS.PROJECTS, JSON.stringify(projects));
-    
     if (await checkSupabaseAccess()) {
       try {
         const { error } = await supabase
           .from('estimate_projects')
           .upsert(project);
-        if (error) console.warn('[Supabase] saveProject error:', error);
-      } catch (e) {
+        if (error) {
+          console.warn('[Supabase] saveProject error:', error);
+          throw new Error(error.message);
+        }
+      } catch (e: any) {
         console.warn('[Supabase] saveProject network error:', e);
+        throw e;
       }
     }
   },
 
   async deleteProject(id: string): Promise<void> {
-    const projects = await this.getProjects();
-    const filtered = projects.filter(p => p.id !== id);
-    localStorage.setItem(KEYS.PROJECTS, JSON.stringify(filtered));
-    
     if (await checkSupabaseAccess()) {
       try {
         const { error } = await supabase
           .from('estimate_projects')
           .delete()
           .eq('id', id);
-        if (error) console.warn('[Supabase] deleteProject error:', error);
-      } catch (e) {
+        if (error) {
+          console.warn('[Supabase] deleteProject error:', error);
+          throw new Error(error.message);
+        }
+      } catch (e: any) {
         console.warn('[Supabase] deleteProject network error:', e);
+        throw e;
       }
     }
   },
@@ -922,8 +887,6 @@ export const StorageAPI = {
   // --- Clients (고객사 주소록) CRUD ---
   async getClients(): Promise<ClientInfo[]> {
     let clients: ClientInfo[] = [];
-    let isDbReadSuccess = false;
-    let dbClients: ClientInfo[] = [];
 
     if (await checkSupabaseAccess()) {
       try {
@@ -932,92 +895,69 @@ export const StorageAPI = {
           .select('*')
           .order('name', { ascending: true });
         if (!error && data) {
-          dbClients = data as ClientInfo[];
-          isDbReadSuccess = true;
+          clients = data as ClientInfo[];
+        } else if (error) {
+          console.warn('[Supabase] getClients error:', error);
         }
       } catch (e) {
         console.warn('[Supabase] getClients network error:', e);
       }
     }
-
-    const localData = localStorage.getItem(KEYS.CLIENTS);
-    const localClients = localData ? JSON.parse(localData) as ClientInfo[] : [];
-
-    if (isDbReadSuccess) {
-      if (dbClients.length > 0) {
-        clients = dbClients;
-        localStorage.setItem(KEYS.CLIENTS, JSON.stringify(dbClients));
-      } else {
-        if (localClients.length > 0) {
-          clients = localClients;
-          this.saveClients(localClients);
-        } else {
-          clients = DEFAULT_CLIENTS;
-          localStorage.setItem(KEYS.CLIENTS, JSON.stringify(DEFAULT_CLIENTS));
-          this.saveClients(DEFAULT_CLIENTS);
-        }
-      }
-    } else {
-      if (localClients.length > 0) {
-        clients = localClients;
-      } else {
-        clients = DEFAULT_CLIENTS;
-        localStorage.setItem(KEYS.CLIENTS, JSON.stringify(DEFAULT_CLIENTS));
-      }
+    
+    if (clients.length === 0) {
+      clients = DEFAULT_CLIENTS;
     }
     return clients;
   },
 
   async saveClients(clients: ClientInfo[]): Promise<void> {
-    localStorage.setItem(KEYS.CLIENTS, JSON.stringify(clients));
     if (await checkSupabaseAccess()) {
       try {
         const { error } = await supabase
           .from('estimate_clients')
           .upsert(clients);
-        if (error) console.warn('[Supabase] saveClients error:', error);
-      } catch (e) {
+        if (error) {
+          console.warn('[Supabase] saveClients error:', error);
+          throw new Error(error.message);
+        }
+      } catch (e: any) {
         console.warn('[Supabase] saveClients network error:', e);
+        throw e;
       }
     }
   },
 
   async saveClient(client: ClientInfo): Promise<void> {
-    const clients = await this.getClients();
-    const idx = clients.findIndex(c => c.id === client.id);
-    if (idx > -1) {
-      clients[idx] = client;
-    } else {
-      clients.push(client);
-    }
-    localStorage.setItem(KEYS.CLIENTS, JSON.stringify(clients));
-
     if (await checkSupabaseAccess()) {
       try {
         const { error } = await supabase
           .from('estimate_clients')
           .upsert(client);
-        if (error) console.warn('[Supabase] saveClient error:', error);
-      } catch (e) {
+        if (error) {
+          console.warn('[Supabase] saveClient error:', error);
+          throw new Error(error.message);
+        }
+      } catch (e: any) {
         console.warn('[Supabase] saveClient network error:', e);
+        throw e;
       }
     }
   },
 
   async deleteClient(id: string): Promise<void> {
-    const clients = await this.getClients();
-    const filtered = clients.filter(c => c.id !== id);
-    localStorage.setItem(KEYS.CLIENTS, JSON.stringify(filtered));
-
     if (await checkSupabaseAccess()) {
       try {
         const { error } = await supabase
           .from('estimate_clients')
           .delete()
           .eq('id', id);
-        if (error) console.warn('[Supabase] deleteClient error:', error);
-      } catch (e) {
+        if (error) {
+          console.warn('[Supabase] deleteClient error:', error);
+          throw new Error(error.message);
+        }
+      } catch (e: any) {
         console.warn('[Supabase] deleteClient network error:', e);
+        throw e;
       }
     }
   },
@@ -1025,8 +965,6 @@ export const StorageAPI = {
   // --- DailyReports (일일 업무 보고서) CRUD ---
   async getDailyReports(): Promise<DailyReport[]> {
     let reports: DailyReport[] = [];
-    let isDbReadSuccess = false;
-    let dbReports: DailyReport[] = [];
 
     if (await checkSupabaseAccess()) {
       try {
@@ -1035,7 +973,7 @@ export const StorageAPI = {
           .select('*')
           .order('report_date', { ascending: false });
         if (!error && data) {
-          dbReports = data.map((r: any) => ({
+          reports = data.map((r: any) => ({
             id: r.id,
             reportDate: r.report_date,
             title: r.title,
@@ -1043,42 +981,17 @@ export const StorageAPI = {
             createdAt: r.created_at,
             createdBy: r.created_by
           })) as DailyReport[];
-          isDbReadSuccess = true;
+        } else if (error) {
+          console.warn('[Supabase] getDailyReports error:', error);
         }
       } catch (e) {
         console.warn('[Supabase] getDailyReports network error:', e);
       }
     }
-
-    const localData = localStorage.getItem(KEYS.DAILY_REPORTS);
-    const localReports = localData ? JSON.parse(localData) as DailyReport[] : [];
-
-    if (isDbReadSuccess) {
-      if (dbReports.length > 0) {
-        reports = dbReports;
-        localStorage.setItem(KEYS.DAILY_REPORTS, JSON.stringify(dbReports));
-      } else {
-        if (localReports.length > 0) {
-          reports = localReports;
-          localReports.forEach(r => this.saveDailyReport(r));
-        }
-      }
-    } else {
-      reports = localReports;
-    }
     return reports;
   },
 
   async saveDailyReport(report: DailyReport): Promise<void> {
-    const reports = await this.getDailyReports();
-    const idx = reports.findIndex(r => r.id === report.id);
-    if (idx > -1) {
-      reports[idx] = report;
-    } else {
-      reports.unshift(report);
-    }
-    localStorage.setItem(KEYS.DAILY_REPORTS, JSON.stringify(reports));
-
     if (await checkSupabaseAccess()) {
       try {
         let currentUserId: string | null = null;
@@ -1098,27 +1011,31 @@ export const StorageAPI = {
         const { error } = await supabase
           .from('estimate_daily_reports')
           .upsert(payload);
-        if (error) console.warn('[Supabase] saveDailyReport error:', error);
-      } catch (e) {
+        if (error) {
+          console.warn('[Supabase] saveDailyReport error:', error);
+          throw new Error(error.message);
+        }
+      } catch (e: any) {
         console.warn('[Supabase] saveDailyReport network error:', e);
+        throw e;
       }
     }
   },
 
   async deleteDailyReport(id: string): Promise<void> {
-    const reports = await this.getDailyReports();
-    const filtered = reports.filter(r => r.id !== id);
-    localStorage.setItem(KEYS.DAILY_REPORTS, JSON.stringify(filtered));
-
     if (await checkSupabaseAccess()) {
       try {
         const { error } = await supabase
           .from('estimate_daily_reports')
           .delete()
           .eq('id', id);
-        if (error) console.warn('[Supabase] deleteDailyReport error:', error);
-      } catch (e) {
+        if (error) {
+          console.warn('[Supabase] deleteDailyReport error:', error);
+          throw new Error(error.message);
+        }
+      } catch (e: any) {
         console.warn('[Supabase] deleteDailyReport network error:', e);
+        throw e;
       }
     }
   },
@@ -1127,7 +1044,6 @@ export const StorageAPI = {
   async getCostItems(): Promise<CostItem[]> {
     let items: CostItem[] = [];
     let isDbReadSuccess = false;
-    let dbItems: CostItem[] = [];
 
     if (await checkSupabaseAccess()) {
       try {
@@ -1136,7 +1052,7 @@ export const StorageAPI = {
           .select('*')
           .order('created_at', { ascending: false });
         if (!error && data) {
-          dbItems = data as CostItem[];
+          items = data as CostItem[];
           isDbReadSuccess = true;
         }
       } catch (e) {
@@ -1144,32 +1060,8 @@ export const StorageAPI = {
       }
     }
 
-    const localData = localStorage.getItem(KEYS.COST_ITEMS);
-    const localItems = localData ? JSON.parse(localData) as CostItem[] : [];
-
-    if (isDbReadSuccess) {
-      if (dbItems.length > 0) {
-        items = dbItems;
-        localStorage.setItem(KEYS.COST_ITEMS, JSON.stringify(dbItems));
-      } else {
-        if (localItems.length > 0) {
-          items = localItems;
-          this.saveCostItems(localItems);
-        } else {
-          const healed = healCostItemsFromProjects(DEFAULT_COST_ITEMS);
-          items = healed;
-          localStorage.setItem(KEYS.COST_ITEMS, JSON.stringify(healed));
-          this.saveCostItems(healed);
-        }
-      }
-    } else {
-      if (localItems.length > 0) {
-        items = localItems;
-      } else {
-        const healed = healCostItemsFromProjects(DEFAULT_COST_ITEMS);
-        items = healed;
-        localStorage.setItem(KEYS.COST_ITEMS, JSON.stringify(healed));
-      }
+    if (items.length === 0) {
+      items = healCostItemsFromProjects(DEFAULT_COST_ITEMS);
     }
     
     // 구버전 데이터 마이그레이션 보정 엔진
@@ -1340,13 +1232,11 @@ export const StorageAPI = {
 
     const finalNeedsUpdate = needsUpdate || isDbReadSuccess || hadDuplicates || hasRecoveredL2;
 
-    if (finalNeedsUpdate) {
-      // 로컬 스토리지 상시 갱신
-      localStorage.setItem(KEYS.COST_ITEMS, JSON.stringify(deduplicatedItems));
-      
-      // 마이그레이션 등으로 보정된 데이터를 Supabase에도 일괄 업서트
-      if (await checkSupabaseAccess()) {
+    if (finalNeedsUpdate && (await checkSupabaseAccess())) {
+      try {
         await this.saveCostItems(deduplicatedItems);
+      } catch (e) {
+        console.warn('[Supabase] auto-clean cost items error:', e);
       }
     }
     
@@ -1354,142 +1244,131 @@ export const StorageAPI = {
   },
 
   async saveCostItems(items: CostItem[]): Promise<void> {
-    localStorage.setItem(KEYS.COST_ITEMS, JSON.stringify(items));
     if (await checkSupabaseAccess()) {
       try {
         const { error } = await supabase
           .from('cost_items')
           .upsert(items);
-        if (error) console.warn('[Supabase] saveCostItems error:', error);
-      } catch (e) {
+        if (error) {
+          console.warn('[Supabase] saveCostItems error:', error);
+          throw new Error(error.message);
+        }
+      } catch (e: any) {
         console.warn('[Supabase] saveCostItems network error:', e);
+        throw e;
       }
     }
   },
 
   async saveCostItem(item: CostItem | CostItem[]): Promise<void> {
-    const items = await this.getCostItems();
-    let updated: CostItem[] = [...items];
-    
-    if (Array.isArray(item)) {
-      updated = [...item, ...updated];
-    } else {
-      const idx = items.findIndex(i => i.id === item.id);
-      if (idx > -1) {
-        updated[idx] = item;
-      } else {
-        updated = [item, ...updated];
-      }
-    }
-    
-    localStorage.setItem(KEYS.COST_ITEMS, JSON.stringify(updated));
-    
     if (await checkSupabaseAccess()) {
       try {
         const payload = Array.isArray(item) ? item : [item];
         const { error } = await supabase
           .from('cost_items')
           .upsert(payload);
-        if (error) console.warn('[Supabase] saveCostItem error:', error);
-      } catch (e) {
+        if (error) {
+          console.warn('[Supabase] saveCostItem error:', error);
+          throw new Error(error.message);
+        }
+      } catch (e: any) {
         console.warn('[Supabase] saveCostItem network error:', e);
+        throw e;
       }
     }
   },
 
   async deleteCostItem(id: string): Promise<void> {
-    const items = await this.getCostItems();
-    const filtered = items.filter(i => i.id !== id);
-    localStorage.setItem(KEYS.COST_ITEMS, JSON.stringify(filtered));
-    
     if (await checkSupabaseAccess()) {
       try {
         const { error } = await supabase
           .from('cost_items')
           .delete()
           .eq('id', id);
-        if (error) console.warn('[Supabase] deleteCostItem error:', error);
-      } catch (e) {
+        if (error) {
+          console.warn('[Supabase] deleteCostItem error:', error);
+          throw new Error(error.message);
+        }
+      } catch (e: any) {
         console.warn('[Supabase] deleteCostItem network error:', e);
+        throw e;
       }
     }
   },
 
   // --- CostPackages (묶음 패키지 상품) CRUD ---
   async getCostPackages(): Promise<CostPackage[]> {
+    let packages: CostPackage[] = [];
     if (await checkSupabaseAccess()) {
       try {
         const { data, error } = await supabase
           .from('cost_packages')
           .select('*')
           .order('created_at', { ascending: false });
-        if (!error && data && data.length > 0) {
-          localStorage.setItem(KEYS.COST_PACKAGES, JSON.stringify(data));
-          return data as CostPackage[];
+        if (!error && data) {
+          packages = data as CostPackage[];
+        } else if (error) {
+          console.warn('[Supabase] getCostPackages error:', error);
         }
-        if (error) console.warn('[Supabase] getCostPackages error:', error);
       } catch (e) {
         console.warn('[Supabase] getCostPackages network error:', e);
       }
     }
-    const data = localStorage.getItem(KEYS.COST_PACKAGES);
-    if (!data) {
-      await this.saveCostPackages(DEFAULT_COST_PACKAGES);
-      return DEFAULT_COST_PACKAGES;
+    
+    if (packages.length === 0) {
+      packages = DEFAULT_COST_PACKAGES;
     }
-    return JSON.parse(data);
+    return packages;
   },
 
   async saveCostPackages(packages: CostPackage[]): Promise<void> {
-    localStorage.setItem(KEYS.COST_PACKAGES, JSON.stringify(packages));
     if (await checkSupabaseAccess()) {
       try {
         const { error } = await supabase
           .from('cost_packages')
           .upsert(packages);
-        if (error) console.warn('[Supabase] saveCostPackages error:', error);
-      } catch (e) {
+        if (error) {
+          console.warn('[Supabase] saveCostPackages error:', error);
+          throw new Error(error.message);
+        }
+      } catch (e: any) {
         console.warn('[Supabase] saveCostPackages network error:', e);
+        throw e;
       }
     }
   },
 
   async saveCostPackage(pkg: CostPackage): Promise<void> {
-    const packages = await this.getCostPackages();
-    const idx = packages.findIndex(p => p.id === pkg.id);
-    if (idx > -1) {
-      packages[idx] = pkg;
-    } else {
-      packages.push(pkg);
-    }
-    localStorage.setItem(KEYS.COST_PACKAGES, JSON.stringify(packages));
-    
     if (await checkSupabaseAccess()) {
       try {
         const { error } = await supabase
           .from('cost_packages')
           .upsert(pkg);
-        if (error) console.warn('[Supabase] saveCostPackage error:', error);
-      } catch (e) {
+        if (error) {
+          console.warn('[Supabase] saveCostPackage error:', error);
+          throw new Error(error.message);
+        }
+      } catch (e: any) {
         console.warn('[Supabase] saveCostPackage network error:', e);
+        throw e;
       }
     }
   },
 
   async deleteCostPackage(id: string): Promise<void> {
-    const packages = await this.getCostPackages();
-    const filtered = packages.filter(p => p.id !== id);
-    localStorage.setItem(KEYS.COST_PACKAGES, JSON.stringify(filtered));
-    
     if (await checkSupabaseAccess()) {
       try {
         const { error } = await supabase
           .from('cost_packages')
           .delete()
           .eq('id', id);
-        if (error) console.warn('[Supabase] deleteCostPackage error:', error);
-      } catch (e) {
+        if (error) {
+          console.warn('[Supabase] deleteCostPackage error:', error);
+          throw new Error(error.message);
+        }
+      } catch (e: any) {
         console.warn('[Supabase] deleteCostPackage network error:', e);
+        throw e;
       }
     }
   },
@@ -1504,7 +1383,6 @@ export const StorageAPI = {
           .eq('id', 'default_vendor')
           .single();
         if (!error && data) {
-          localStorage.setItem(KEYS.VENDOR_INFO, JSON.stringify(data));
           return data as VendorInfo;
         }
         if (error && error.code === 'PGRST116') {
@@ -1516,31 +1394,23 @@ export const StorageAPI = {
         console.warn('[Supabase] getVendorInfo network error:', e);
       }
     }
-    const data = localStorage.getItem(KEYS.VENDOR_INFO);
-    if (!data) {
-      await this.saveVendorInfo(DEFAULT_VENDOR_INFO);
-      return DEFAULT_VENDOR_INFO;
-    }
-    const parsed = JSON.parse(data) as VendorInfo;
-    if (parsed.ownerName === '홍길동' || parsed.address?.includes('5층')) {
-      await this.saveVendorInfo(DEFAULT_VENDOR_INFO);
-      return DEFAULT_VENDOR_INFO;
-    }
-    return parsed;
+    return DEFAULT_VENDOR_INFO;
   },
 
   async saveVendorInfo(info: VendorInfo): Promise<void> {
     const payload = { id: 'default_vendor', ...info };
-    localStorage.setItem(KEYS.VENDOR_INFO, JSON.stringify(info));
-    
     if (await checkSupabaseAccess()) {
       try {
         const { error } = await supabase
           .from('vendor_info')
           .upsert(payload);
-        if (error) console.warn('[Supabase] saveVendorInfo error:', error);
-      } catch (e) {
+        if (error) {
+          console.warn('[Supabase] saveVendorInfo error:', error);
+          throw new Error(error.message);
+        }
+      } catch (e: any) {
         console.warn('[Supabase] saveVendorInfo network error:', e);
+        throw e;
       }
     }
   },
@@ -1563,23 +1433,29 @@ export const StorageAPI = {
       const parsed = JSON.parse(jsonString);
       const errors: string[] = [];
       
+      // 현재 로그인한 사용자 세션 정보 가져오기
+      let currentUserId: string | null = null;
+      if (await checkSupabaseAccess()) {
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session && session.user) {
+            currentUserId = session.user.id;
+          }
+        } catch (e) {
+          console.warn('[Import] 사용자 세션 확인 실패:', e);
+        }
+      }
+      
       // 0. 일일 업무 보고서 복원
       if (parsed.dailyReports && Array.isArray(parsed.dailyReports)) {
-        localStorage.setItem(KEYS.DAILY_REPORTS, JSON.stringify(parsed.dailyReports));
         if (await checkSupabaseAccess()) {
           try {
-            let currentUserId: string | null = null;
-            const { data: { session } } = await supabase.auth.getSession();
-            if (session && session.user) {
-              currentUserId = session.user.id;
-            }
-
             const payloads = parsed.dailyReports.map((r: any) => ({
               id: r.id,
               report_date: r.reportDate,
               title: r.title,
               completed_tasks: r.completedTasks,
-              created_by: currentUserId || r.createdBy || null
+              created_by: currentUserId || r.createdBy || r.created_by || null
             }));
 
             const { error } = await supabase
@@ -1596,12 +1472,22 @@ export const StorageAPI = {
 
       // 1. 고객사 정보를 프로젝트보다 먼저 복원하여 외래키 참조 관계 유지
       if (parsed.clients && Array.isArray(parsed.clients)) {
-        localStorage.setItem(KEYS.CLIENTS, JSON.stringify(parsed.clients));
+        const sanitizedClients = parsed.clients.map((client: any) => {
+          const cleaned = { ...client };
+          if (currentUserId) {
+            cleaned.created_by = currentUserId;
+            cleaned.createdBy = currentUserId;
+          } else {
+            delete cleaned.created_by;
+            delete cleaned.createdBy;
+          }
+          return cleaned;
+        });
         if (await checkSupabaseAccess()) {
           try {
             const { error } = await supabase
               .from('estimate_clients')
-              .upsert(parsed.clients);
+              .upsert(sanitizedClients);
             if (error) {
               errors.push(`고객사(estimate_clients) DB 업로드 실패: ${error.message} (코드: ${error.code})`);
             }
@@ -1613,16 +1499,6 @@ export const StorageAPI = {
       
       // 2. 프로젝트 복원 및 외래키(created_by) 데이터 정화 처리
       if (parsed.projects && Array.isArray(parsed.projects)) {
-        let currentUserId: string | null = null;
-        try {
-          const { data: { session } } = await supabase.auth.getSession();
-          if (session && session.user) {
-            currentUserId = session.user.id;
-          }
-        } catch (e) {
-          console.warn('[Import] 사용자 세션 확인 실패:', e);
-        }
-
         const sanitizedProjects = parsed.projects.map((proj: any) => {
           const cleaned = { ...proj };
           
@@ -1630,13 +1506,13 @@ export const StorageAPI = {
           // 외래키(auth.users) 위반 에러 방지 목적
           if (currentUserId) {
             cleaned.createdBy = currentUserId;
+            cleaned.created_by = currentUserId;
           } else {
             delete cleaned.createdBy;
+            delete cleaned.created_by;
           }
           return cleaned;
         });
-
-        localStorage.setItem(KEYS.PROJECTS, JSON.stringify(sanitizedProjects));
         
         if (await checkSupabaseAccess()) {
           try {
@@ -1651,12 +1527,20 @@ export const StorageAPI = {
           }
         }
       } else if (parsed.projects) {
-        localStorage.setItem(KEYS.PROJECTS, JSON.stringify(parsed.projects));
+        const proj = parsed.projects;
+        const cleaned = { ...proj };
+        if (currentUserId) {
+          cleaned.createdBy = currentUserId;
+          cleaned.created_by = currentUserId;
+        } else {
+          delete cleaned.createdBy;
+          delete cleaned.created_by;
+        }
         if (await checkSupabaseAccess()) {
           try {
             const { error } = await supabase
               .from('estimate_projects')
-              .upsert(parsed.projects);
+              .upsert(cleaned);
             if (error) {
               errors.push(`견적 프로젝트 DB 업로드 실패: ${error.message} (코드: ${error.code})`);
             }
@@ -1668,12 +1552,22 @@ export const StorageAPI = {
       
       // 3. 단가 항목 복원
       if (parsed.costItems && Array.isArray(parsed.costItems)) {
-        localStorage.setItem(KEYS.COST_ITEMS, JSON.stringify(parsed.costItems));
+        const sanitizedCostItems = parsed.costItems.map((item: any) => {
+          const cleaned = { ...item };
+          if (currentUserId) {
+            cleaned.created_by = currentUserId;
+            cleaned.createdBy = currentUserId;
+          } else {
+            delete cleaned.created_by;
+            delete cleaned.createdBy;
+          }
+          return cleaned;
+        });
         if (await checkSupabaseAccess()) {
           try {
             const { error } = await supabase
               .from('cost_items')
-              .upsert(parsed.costItems);
+              .upsert(sanitizedCostItems);
             if (error) {
               errors.push(`단가 항목(cost_items) DB 업로드 실패: ${error.message} (코드: ${error.code})`);
             }
@@ -1685,12 +1579,22 @@ export const StorageAPI = {
       
       // 4. 패키지 복원
       if (parsed.costPackages && Array.isArray(parsed.costPackages)) {
-        localStorage.setItem(KEYS.COST_PACKAGES, JSON.stringify(parsed.costPackages));
+        const sanitizedCostPackages = parsed.costPackages.map((pkg: any) => {
+          const cleaned = { ...pkg };
+          if (currentUserId) {
+            cleaned.created_by = currentUserId;
+            cleaned.createdBy = currentUserId;
+          } else {
+            delete cleaned.created_by;
+            delete cleaned.createdBy;
+          }
+          return cleaned;
+        });
         if (await checkSupabaseAccess()) {
           try {
             const { error } = await supabase
               .from('cost_packages')
-              .upsert(parsed.costPackages);
+              .upsert(sanitizedCostPackages);
             if (error) {
               errors.push(`묶음 패키지(cost_packages) DB 업로드 실패: ${error.message} (코드: ${error.code})`);
             }
@@ -1702,10 +1606,17 @@ export const StorageAPI = {
       
       // 5. 공급자 정보 복원
       if (parsed.vendorInfo) {
-        localStorage.setItem(KEYS.VENDOR_INFO, JSON.stringify(parsed.vendorInfo));
+        const cleanedVendor = { ...parsed.vendorInfo };
+        if (currentUserId) {
+          cleanedVendor.created_by = currentUserId;
+          cleanedVendor.createdBy = currentUserId;
+        } else {
+          delete cleanedVendor.created_by;
+          delete cleanedVendor.createdBy;
+        }
         if (await checkSupabaseAccess()) {
           try {
-            const payload = { id: 'default_vendor', ...parsed.vendorInfo };
+            const payload = { id: 'default_vendor', ...cleanedVendor };
             const { error } = await supabase
               .from('vendor_info')
               .upsert(payload);
@@ -1797,12 +1708,11 @@ export const StorageAPI = {
             units: Array.isArray(data.units) ? data.units : JSON.parse(data.units),
             namesList: typeof data.names_list === 'object' ? data.names_list : JSON.parse(data.names_list)
           };
-          localStorage.setItem(KEYS.SETTINGS, JSON.stringify(parsed));
           return parsed;
         }
         
         if (error && (error.code === 'PGRST116' || error.code === '42P01')) {
-          console.warn('[Supabase] estimate_settings 테이블이 존재하지 않거나 설정이 비어있습니다. 로컬 기본 설정을 이용하고 업서트를 시도합니다.');
+          console.warn('[Supabase] estimate_settings 테이블이 존재하지 않거나 설정이 비어있습니다. DB 업서트를 시도합니다.');
           if (error.code === 'PGRST116') {
             await this.saveSettings(defaultSettings);
           }
@@ -1813,32 +1723,10 @@ export const StorageAPI = {
         console.warn('[Supabase] getSettings network error:', e);
       }
     }
-
-    const localData = localStorage.getItem(KEYS.SETTINGS);
-    if (!localData) {
-      const legacyCats = localStorage.getItem('estimate_notion_categories_v4');
-      const legacyUnits = localStorage.getItem('estimate_notion_units_v4');
-      const legacyNames = localStorage.getItem('estimate_notion_names_v4');
-      
-      const migrated = {
-        categories: legacyCats ? JSON.parse(legacyCats) : defaultSettings.categories,
-        units: legacyUnits ? JSON.parse(legacyUnits) : defaultSettings.units,
-        namesList: legacyNames ? JSON.parse(legacyNames) : defaultSettings.namesList
-      };
-
-      localStorage.setItem(KEYS.SETTINGS, JSON.stringify(migrated));
-      return migrated;
-    }
-    return JSON.parse(localData);
+    return defaultSettings;
   },
 
   async saveSettings(settings: { categories: string[]; units: string[]; namesList: Record<string, string[]> }): Promise<void> {
-    localStorage.setItem(KEYS.SETTINGS, JSON.stringify(settings));
-    
-    localStorage.setItem('estimate_notion_categories_v4', JSON.stringify(settings.categories));
-    localStorage.setItem('estimate_notion_units_v4', JSON.stringify(settings.units));
-    localStorage.setItem('estimate_notion_names_v4', JSON.stringify(settings.namesList));
-
     if (await checkSupabaseAccess()) {
       try {
         const { error } = await supabase
@@ -1850,14 +1738,12 @@ export const StorageAPI = {
             names_list: settings.namesList
           });
         if (error) {
-          if (error.code === '42P01') {
-            console.warn('[Supabase] estimate_settings 테이블이 존재하지 않아 DB에 저장하지 못했습니다. 로컬스토리지 전용 모드로 원활히 구동됩니다.');
-          } else {
-            console.warn('[Supabase] saveSettings error:', error);
-          }
+          console.warn('[Supabase] saveSettings error:', error);
+          throw new Error(error.message);
         }
-      } catch (e) {
+      } catch (e: any) {
         console.warn('[Supabase] saveSettings network error:', e);
+        throw e;
       }
     }
   },
