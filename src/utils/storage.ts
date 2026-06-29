@@ -741,8 +741,167 @@ export function calculateRowAmounts(row: Omit<EstimateRow, 'supplyPrice' | 'vat'
 // --- LocalStorage API ---
 
 export const StorageAPI = {
+  // --- 로컬 데이터 자가 구출(마이그레이션) 엔진 ---
+  // 개편 이전에 로컬스토리지에만 저장되고 Supabase DB에는 저장되지 못했던 소중한 사용자 데이터를 구출합니다.
+  async rescueLocalDataToSupabase(): Promise<void> {
+    if (!(await checkSupabaseAccess())) return;
+
+    try {
+      let currentUserId: string | null = null;
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session && session.user) {
+        currentUserId = session.user.id;
+      }
+
+      // 1. 고객사 구출
+      const localClientsData = localStorage.getItem('estimate_clients');
+      if (localClientsData) {
+        const localClients = JSON.parse(localClientsData);
+        if (Array.isArray(localClients) && localClients.length > 0) {
+          const sanitized = localClients.map((c: any) => {
+            const cleaned = { ...c };
+            if (currentUserId) {
+              cleaned.created_by = currentUserId;
+              cleaned.createdBy = currentUserId;
+            }
+            return cleaned;
+          });
+          const { error } = await supabase.from('estimate_clients').upsert(sanitized);
+          if (!error) {
+            localStorage.setItem('estimate_clients_backup_rescued', localClientsData);
+            localStorage.removeItem('estimate_clients');
+            console.log('[Rescue] Successfully migrated estimate_clients!');
+          } else {
+            console.warn('[Rescue] Clients migration error:', error);
+          }
+        }
+      }
+
+      // 2. 프로젝트 구출
+      const localProjectsData = localStorage.getItem('estimate_projects');
+      if (localProjectsData) {
+        const localProjects = JSON.parse(localProjectsData) as EstimateProject[];
+        if (Array.isArray(localProjects) && localProjects.length > 0) {
+          const sanitized = localProjects.map((p: any) => {
+            const cleaned = { ...p };
+            if (currentUserId) {
+              cleaned.created_by = currentUserId;
+              cleaned.createdBy = currentUserId;
+            }
+            return cleaned;
+          });
+          const { error } = await supabase.from('estimate_projects').upsert(sanitized);
+          if (!error) {
+            localStorage.setItem('estimate_projects_backup_rescued', localProjectsData);
+            localStorage.removeItem('estimate_projects');
+            console.log('[Rescue] Successfully migrated estimate_projects!');
+          } else {
+            console.warn('[Rescue] Projects migration error:', error);
+          }
+        }
+      }
+
+      // 3. 단가 항목 구출
+      const localItemsData = localStorage.getItem('estimate_cost_items');
+      if (localItemsData) {
+        const localItems = JSON.parse(localItemsData);
+        if (Array.isArray(localItems) && localItems.length > 0) {
+          const sanitized = localItems.map((i: any) => {
+            const cleaned = { ...i };
+            if (currentUserId) {
+              cleaned.created_by = currentUserId;
+              cleaned.createdBy = currentUserId;
+            }
+            return cleaned;
+          });
+          const { error } = await supabase.from('cost_items').upsert(sanitized);
+          if (!error) {
+            localStorage.setItem('estimate_cost_items_backup_rescued', localItemsData);
+            localStorage.removeItem('estimate_cost_items');
+            console.log('[Rescue] Successfully migrated cost_items!');
+          } else {
+            console.warn('[Rescue] CostItems migration error:', error);
+          }
+        }
+      }
+
+      // 4. 일일 보고서 구출
+      const localReportsData = localStorage.getItem('estimate_daily_reports');
+      if (localReportsData) {
+        const localReports = JSON.parse(localReportsData);
+        if (Array.isArray(localReports) && localReports.length > 0) {
+          const sanitized = localReports.map((r: any) => ({
+            id: r.id,
+            report_date: r.reportDate,
+            title: r.title,
+            completed_tasks: r.completedTasks,
+            created_by: currentUserId || r.createdBy || r.created_by || null
+          }));
+          const { error } = await supabase.from('estimate_daily_reports').upsert(sanitized);
+          if (!error) {
+            localStorage.setItem('estimate_daily_reports_backup_rescued', localReportsData);
+            localStorage.removeItem('estimate_daily_reports');
+            console.log('[Rescue] Successfully migrated estimate_daily_reports!');
+          } else {
+            console.warn('[Rescue] DailyReports migration error:', error);
+          }
+        }
+      }
+
+      // 5. 묶음 패키지 구출
+      const localPackagesData = localStorage.getItem('estimate_cost_packages');
+      if (localPackagesData) {
+        const localPackages = JSON.parse(localPackagesData);
+        if (Array.isArray(localPackages) && localPackages.length > 0) {
+          const sanitized = localPackages.map((p: any) => {
+            const cleaned = { ...p };
+            if (currentUserId) {
+              cleaned.created_by = currentUserId;
+              cleaned.createdBy = currentUserId;
+            }
+            return cleaned;
+          });
+          const { error } = await supabase.from('cost_packages').upsert(sanitized);
+          if (!error) {
+            localStorage.setItem('estimate_cost_packages_backup_rescued', localPackagesData);
+            localStorage.removeItem('estimate_cost_packages');
+            console.log('[Rescue] Successfully migrated cost_packages!');
+          } else {
+            console.warn('[Rescue] CostPackages migration error:', error);
+          }
+        }
+      }
+
+      // 6. 공급자 정보 구출
+      const localVendorData = localStorage.getItem('estimate_vendor_info');
+      if (localVendorData) {
+        const localVendor = JSON.parse(localVendorData);
+        if (localVendor) {
+          const cleaned = { ...localVendor };
+          if (currentUserId) {
+            cleaned.created_by = currentUserId;
+            cleaned.createdBy = currentUserId;
+          }
+          const payload = { id: 'default_vendor', ...cleaned };
+          const { error } = await supabase.from('vendor_info').upsert(payload);
+          if (!error) {
+            localStorage.setItem('estimate_vendor_info_backup_rescued', localVendorData);
+            localStorage.removeItem('estimate_vendor_info');
+            console.log('[Rescue] Successfully migrated vendor_info!');
+          } else {
+            console.warn('[Rescue] VendorInfo migration error:', error);
+          }
+        }
+      }
+
+    } catch (e) {
+      console.warn('[Rescue] Local data migration failed:', e);
+    }
+  },
+
   // --- Projects (견적 프로젝트) CRUD ---
   async getProjects(): Promise<EstimateProject[]> {
+    await this.rescueLocalDataToSupabase();
     let projects: EstimateProject[] = [];
 
     if (await checkSupabaseAccess()) {
