@@ -1655,7 +1655,23 @@ export const StorageAPI = {
 
   async importData(jsonString: string): Promise<{ success: boolean; error?: string }> {
     try {
-      const parsed = JSON.parse(jsonString);
+      let parsed = JSON.parse(jsonString);
+      
+      // [긴급 복구 덤프 자동 해석기]
+      // 만약 업로드된 파일이 일반 백업 파일이 아니라, 우리가 제공한 localstorage_raw_dump.json 파일인 경우
+      // 내부 문자열 값들을 파싱하여 표준 포맷으로 자동 변환해 줍니다.
+      if (parsed.estimate_projects || parsed.estimate_clients || parsed.estimate_cost_items) {
+        console.log('[Import] Emergency RAW dump detected. Transforming to standard backup format...');
+        parsed = {
+          projects: parsed.estimate_projects ? JSON.parse(parsed.estimate_projects) : [],
+          costItems: parsed.estimate_cost_items ? JSON.parse(parsed.estimate_cost_items) : [],
+          costPackages: parsed.estimate_cost_packages ? JSON.parse(parsed.estimate_cost_packages) : [],
+          vendorInfo: parsed.estimate_vendor_info ? JSON.parse(parsed.estimate_vendor_info) : null,
+          clients: parsed.estimate_clients ? JSON.parse(parsed.estimate_clients) : [],
+          dailyReports: parsed.estimate_daily_reports ? JSON.parse(parsed.estimate_daily_reports) : []
+        };
+      }
+
       const errors: string[] = [];
       
       // 현재 로그인한 사용자 세션 정보 가져오기
