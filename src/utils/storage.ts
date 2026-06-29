@@ -1657,18 +1657,31 @@ export const StorageAPI = {
     try {
       let parsed = JSON.parse(jsonString);
       
-      // [긴급 복구 덤프 자동 해석기]
-      // 만약 업로드된 파일이 일반 백업 파일이 아니라, 우리가 제공한 localstorage_raw_dump.json 파일인 경우
-      // 내부 문자열 값들을 파싱하여 표준 포맷으로 자동 변환해 줍니다.
-      if (parsed.estimate_projects || parsed.estimate_clients || parsed.estimate_cost_items) {
-        console.log('[Import] Emergency RAW dump detected. Transforming to standard backup format...');
+      // [긴급 복구 덤프 자동 해석기 - 수렴형]
+      // 만약 업로드된 파일이 우리가 제공한 localstorage_raw_dump.json 파일인 경우
+      // 원본 키 또는 백업 보존 키(_backup_rescued)를 자동 감지하여 표준 포맷으로 완벽히 복원합니다.
+      const hasEmergencyDump = 
+        parsed.estimate_projects || parsed.estimate_projects_backup_rescued || 
+        parsed.estimate_clients || parsed.estimate_clients_backup_rescued || 
+        parsed.estimate_cost_items || parsed.estimate_cost_items_backup_rescued;
+
+      if (hasEmergencyDump) {
+        console.log('[Import] Emergency RAW backup dump detected. Reconstructing standard format...');
+        
+        const projectsStr = parsed.estimate_projects_backup_rescued || parsed.estimate_projects || '[]';
+        const clientsStr = parsed.estimate_clients_backup_rescued || parsed.estimate_clients || '[]';
+        const itemsStr = parsed.estimate_cost_items_backup_rescued || parsed.estimate_cost_items || '[]';
+        const packagesStr = parsed.estimate_cost_packages_backup_rescued || parsed.estimate_cost_packages || '[]';
+        const reportsStr = parsed.estimate_daily_reports_backup_rescued || parsed.estimate_daily_reports || '[]';
+        const vendorStr = parsed.estimate_vendor_info_backup_rescued || parsed.estimate_vendor_info || 'null';
+
         parsed = {
-          projects: parsed.estimate_projects ? JSON.parse(parsed.estimate_projects) : [],
-          costItems: parsed.estimate_cost_items ? JSON.parse(parsed.estimate_cost_items) : [],
-          costPackages: parsed.estimate_cost_packages ? JSON.parse(parsed.estimate_cost_packages) : [],
-          vendorInfo: parsed.estimate_vendor_info ? JSON.parse(parsed.estimate_vendor_info) : null,
-          clients: parsed.estimate_clients ? JSON.parse(parsed.estimate_clients) : [],
-          dailyReports: parsed.estimate_daily_reports ? JSON.parse(parsed.estimate_daily_reports) : []
+          projects: JSON.parse(projectsStr),
+          clients: JSON.parse(clientsStr),
+          costItems: JSON.parse(itemsStr),
+          costPackages: JSON.parse(packagesStr),
+          dailyReports: JSON.parse(reportsStr),
+          vendorInfo: JSON.parse(vendorStr)
         };
       }
 
