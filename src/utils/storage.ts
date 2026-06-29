@@ -760,9 +760,7 @@ export const StorageAPI = {
         if (Array.isArray(localClients) && localClients.length > 0) {
           const sanitized = localClients.map((c: any) => {
             const cleaned = { ...c };
-            if (currentUserId) {
-              cleaned.created_by = currentUserId;
-            }
+            delete cleaned.created_by;
             delete cleaned.createdBy;
             return cleaned;
           });
@@ -859,9 +857,7 @@ export const StorageAPI = {
         if (Array.isArray(localPackages) && localPackages.length > 0) {
           const sanitized = localPackages.map((p: any) => {
             const cleaned = { ...p };
-            if (currentUserId) {
-              cleaned.created_by = currentUserId;
-            }
+            delete cleaned.created_by;
             delete cleaned.createdBy;
             return cleaned;
           });
@@ -883,9 +879,7 @@ export const StorageAPI = {
         const localVendor = JSON.parse(localVendorData);
         if (localVendor) {
           const cleaned = { ...localVendor };
-          if (currentUserId) {
-            cleaned.created_by = currentUserId;
-          }
+          delete cleaned.created_by;
           delete cleaned.createdBy;
           const payload = { id: 'default_vendor', ...cleaned };
           const { error } = await supabase.from('vendor_info').upsert(payload);
