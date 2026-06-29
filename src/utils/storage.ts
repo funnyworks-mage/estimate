@@ -1699,9 +1699,7 @@ export const StorageAPI = {
       if (parsed.clients && Array.isArray(parsed.clients)) {
         const sanitizedClients = parsed.clients.map((client: any) => {
           const cleaned = { ...client };
-          if (currentUserId) {
-            cleaned.created_by = currentUserId;
-          }
+          delete cleaned.created_by;
           delete cleaned.createdBy;
           return cleaned;
         });
@@ -1792,9 +1790,7 @@ export const StorageAPI = {
       if (parsed.costPackages && Array.isArray(parsed.costPackages)) {
         const sanitizedCostPackages = parsed.costPackages.map((pkg: any) => {
           const cleaned = { ...pkg };
-          if (currentUserId) {
-            cleaned.created_by = currentUserId;
-          }
+          delete cleaned.created_by;
           delete cleaned.createdBy;
           return cleaned;
         });
@@ -1815,9 +1811,7 @@ export const StorageAPI = {
       // 5. 공급자 정보 복원
       if (parsed.vendorInfo) {
         const cleanedVendor = { ...parsed.vendorInfo };
-        if (currentUserId) {
-          cleanedVendor.created_by = currentUserId;
-        }
+        delete cleanedVendor.created_by;
         delete cleanedVendor.createdBy;
         if (await checkSupabaseAccess()) {
           try {
