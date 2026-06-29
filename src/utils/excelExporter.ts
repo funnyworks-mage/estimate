@@ -217,6 +217,8 @@ export function exportProjectToExcel(project: EstimateProject, libraryItems: Cos
     right: { style: 'thin', color: { rgb: 'CCCCCC' } }
   };
   
+  const maxTableRowIndex = currentRow - 1;
+  
   Object.keys(ws).forEach((key) => {
     if (key.startsWith('!')) return;
     
@@ -233,75 +235,100 @@ export function exportProjectToExcel(project: EstimateProject, libraryItems: Cos
       border: { ...borderThin }
     };
     
-    // A. 타이틀 스타일 (0행 ~ 1행)
+    // A. 타이틀 스타일 (0행 ~ 1행) -> 14pt로 축소 및 테두리 제거
     if (r >= 0 && r <= 1) {
-      cell.s.font = { name: '맑은 고딕', size: 18, bold: true, underline: true };
+      cell.s.font = { name: '맑은 고딕', size: 14, bold: true, underline: true };
       cell.s.alignment = { horizontal: 'center', vertical: 'center' };
-      delete cell.s.border; // 테두리 제거
+      delete cell.s.border;
       return;
     }
     
-    // B. 정보 영역 스타일 (2행 ~ 6행)
+    // B. 정보 영역 스타일 (2행 ~ 6행) -> 9pt 고정 및 테두리 제거
     if (r >= 2 && r <= 6) {
       cell.s.font = { name: '맑은 고딕', size: 9 };
-      delete cell.s.border; // 테두리 제거
+      delete cell.s.border;
       if (c >= 6) { // 공급자 우측 정렬
         cell.s.alignment = { horizontal: 'right', vertical: 'center' };
       }
       return;
     }
     
-    // C. 합계금액 요약 바 스타일 (7행)
+    // C. 합계금액 요약 바 스타일 (7행) -> 9pt 고정
     if (r === 7) {
-      cell.s.font = { name: '맑은 고딕', size: 10, bold: true };
+      cell.s.font = { name: '맑은 고딕', size: 9, bold: true };
       cell.s.fill = { fgColor: { rgb: 'E2EFDA' } }; // 연두색 배경
       cell.s.alignment = { horizontal: 'left', vertical: 'center' };
       cell.s.border = {
-        top: { style: 'medium', color: { rgb: '555555' } },
-        bottom: { style: 'medium', color: { rgb: '555555' } }
+        top: { style: 'medium', color: { rgb: '000000' } },
+        bottom: { style: 'medium', color: { rgb: '000000' } }
       };
       return;
     }
     
-    // D. 테이블 헤더 스타일 (9행)
-    if (r === 9) {
-      cell.s.font = { name: '맑은 고딕', size: 9, bold: true };
-      cell.s.fill = { fgColor: { rgb: 'F2F2F2' } }; // 회색 배경
-      cell.s.alignment = { horizontal: 'center', vertical: 'center' };
-      cell.s.border = {
-        top: { style: 'medium', color: { rgb: '555555' } },
-        bottom: { style: 'medium', color: { rgb: '555555' } },
+    // D. 테이블 영역 (9행 ~ 마지막 행) 테두리 선 정밀 가이드 (바깥 테두리는 두꺼운 검은색)
+    if (r >= 9 && r <= maxTableRowIndex) {
+      const cellBorder: any = {
+        top: { style: 'thin', color: { rgb: 'CCCCCC' } },
+        bottom: { style: 'thin', color: { rgb: 'CCCCCC' } },
         left: { style: 'thin', color: { rgb: 'CCCCCC' } },
         right: { style: 'thin', color: { rgb: 'CCCCCC' } }
       };
-      return;
-    }
-    
-    // E. 최하단 계(원화, 외화) 행 스타일
-    if (r >= totalRowIndex) {
-      cell.s.font = { name: '맑은 고딕', size: 9, bold: true };
-      cell.s.border = {
-        top: { style: 'thin', color: { rgb: '555555' } },
-        bottom: { style: 'double', color: { rgb: '555555' } } // 회계식 이중 테두리선
-      };
-      if (c === 7) {
-        cell.s.alignment = { horizontal: 'right', vertical: 'center' };
-      } else {
+      
+      // 맨 바깥 외곽선에 검은색 두꺼운 테두리(medium) 적용
+      if (r === 9) { // 테이블 헤더 행 (맨 위)
+        cellBorder.top = { style: 'medium', color: { rgb: '000000' } };
+      }
+      if (r === maxTableRowIndex) { // 테이블 마지막 행 (맨 아래)
+        cellBorder.bottom = { style: 'medium', color: { rgb: '000000' } };
+      }
+      if (c === 0) { // 테이블 첫 번째 열 (맨 왼쪽)
+        cellBorder.left = { style: 'medium', color: { rgb: '000000' } };
+      }
+      if (c === 8) { // 테이블 마지막 열 (맨 오른쪽)
+        cellBorder.right = { style: 'medium', color: { rgb: '000000' } };
+      }
+      
+      // 테이블 헤더(9행) 하단 구분선
+      if (r === 9) {
+        cellBorder.bottom = { style: 'medium', color: { rgb: '000000' } };
+        cell.s.font = { name: '맑은 고딕', size: 9, bold: true };
+        cell.s.fill = { fgColor: { rgb: 'F2F2F2' } }; // 회색 헤더 배경
         cell.s.alignment = { horizontal: 'center', vertical: 'center' };
       }
-      return;
-    }
-    
-    // F. 데이터 행 정렬 가이드 (10행 ~ totalRowIndex - 1)
-    if (r >= 10 && r < totalRowIndex) {
-      if (c === 0 || c === 1 || c === 4 || c === 5) {
-        cell.s.alignment.horizontal = 'center';
-      } else if (c === 2 || c === 3) {
-        cell.s.alignment.horizontal = 'left';
-        cell.s.alignment.wrapText = true; // 줄바꿈 활성화
-      } else if (c === 6 || c === 7) {
-        cell.s.alignment.horizontal = 'right';
+      // 계(원화, 외화) 행 스타일
+      else if (r >= totalRowIndex) {
+        cell.s.font = { name: '맑은 고딕', size: 9, bold: true };
+        
+        // 계 행의 위쪽 경계선은 살짝 더 두드러지게 검은색 실선 적용
+        if (r === totalRowIndex) {
+          cellBorder.top = { style: 'thin', color: { rgb: '000000' } };
+        }
+        
+        // 계 행의 아래쪽 구분선
+        if (r === maxTableRowIndex) {
+          cellBorder.bottom = { style: 'medium', color: { rgb: '000000' } };
+        } else {
+          cellBorder.bottom = { style: 'double', color: { rgb: '000000' } }; // 계(원화)는 이중 밑선
+        }
+        
+        if (c === 7) {
+          cell.s.alignment = { horizontal: 'right', vertical: 'center' };
+        } else {
+          cell.s.alignment = { horizontal: 'center', vertical: 'center' };
+        }
       }
+      // 일반 데이터 행들 정렬
+      else {
+        if (c === 0 || c === 1 || c === 4 || c === 5) {
+          cell.s.alignment = { horizontal: 'center', vertical: 'center' };
+        } else if (c === 2 || c === 3) {
+          cell.s.alignment = { horizontal: 'left', vertical: 'center', wrapText: true };
+        } else if (c === 6 || c === 7) {
+          cell.s.alignment = { horizontal: 'right', vertical: 'center' };
+        }
+      }
+      
+      cell.s.border = cellBorder;
     }
   });
 
