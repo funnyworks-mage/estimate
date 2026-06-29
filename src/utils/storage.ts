@@ -792,9 +792,9 @@ export const StorageAPI = {
           const sanitized = localProjects.map((p: any) => {
             const cleaned = { ...p };
             if (currentUserId) {
-              cleaned.created_by = currentUserId;
+              cleaned.createdBy = currentUserId;
             }
-            delete cleaned.createdBy;
+            delete cleaned.created_by;
             return cleaned;
           });
           const { error } = await supabase.from('estimate_projects').upsert(sanitized);
@@ -823,9 +823,7 @@ export const StorageAPI = {
         if (Array.isArray(localItems) && localItems.length > 0) {
           const sanitized = localItems.map((i: any) => {
             const cleaned = { ...i };
-            if (currentUserId) {
-              cleaned.created_by = currentUserId;
-            }
+            delete cleaned.created_by;
             delete cleaned.createdBy;
             return cleaned;
           });
@@ -1721,7 +1719,7 @@ export const StorageAPI = {
         }
       }
       
-      // 2. 프로젝트 복원 및 외래키(created_by) 데이터 정화 처리
+      // 2. 프로젝트 복원 및 외래키(createdBy) 데이터 정화 처리
       if (parsed.projects && Array.isArray(parsed.projects)) {
         const sanitizedProjects = parsed.projects.map((proj: any) => {
           const cleaned = { ...proj };
@@ -1729,9 +1727,9 @@ export const StorageAPI = {
           // 백업 데이터 내의 생성자 ID가 현재 로그인한 유저와 매칭되도록 보정
           // 외래키(auth.users) 위반 에러 방지 목적
           if (currentUserId) {
-            cleaned.created_by = currentUserId;
+            cleaned.createdBy = currentUserId;
           }
-          delete cleaned.createdBy;
+          delete cleaned.created_by;
           return cleaned;
         });
         
@@ -1751,9 +1749,9 @@ export const StorageAPI = {
         const proj = parsed.projects;
         const cleaned = { ...proj };
         if (currentUserId) {
-          cleaned.created_by = currentUserId;
+          cleaned.createdBy = currentUserId;
         }
-        delete cleaned.createdBy;
+        delete cleaned.created_by;
         if (await checkSupabaseAccess()) {
           try {
             const { error } = await supabase
@@ -1772,9 +1770,7 @@ export const StorageAPI = {
       if (parsed.costItems && Array.isArray(parsed.costItems)) {
         const sanitizedCostItems = parsed.costItems.map((item: any) => {
           const cleaned = { ...item };
-          if (currentUserId) {
-            cleaned.created_by = currentUserId;
-          }
+          delete cleaned.created_by;
           delete cleaned.createdBy;
           return cleaned;
         });
