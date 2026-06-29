@@ -202,6 +202,11 @@ export function useEstimateProjects({ user, libraryItems }: UseEstimateProjectsP
   const handleDeleteProject = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (confirm('이 견적 프로젝트를 정말 삭제하시겠습니까?')) {
+      try {
+        await StorageAPI.deleteProject(id);
+      } catch (err) {
+        console.warn('[DB] 프로젝트 실제 삭제 실패 (스킵 후 로컬 동기화):', err);
+      }
       const updated = projects.filter(p => p.id !== id);
       await updateProjectsState(updated);
       if (selectedProjectId === id) {
