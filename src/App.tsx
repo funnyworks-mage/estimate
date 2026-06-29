@@ -364,39 +364,6 @@ export default function App() {
           onProfileUpdate={(updatedUser) => setUser(updatedUser)} 
         />
       )}
-
-      {/* 긴급 데이터 유실 추적용 디버그 패널 */}
-      <div style={{ position: 'fixed', bottom: '20px', right: '20px', width: '400px', maxHeight: '400px', overflowY: 'auto', backgroundColor: '#fff', border: '2px solid red', padding: '16px', zIndex: 99999, borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', color: '#333' }}>
-        <h3 style={{ color: 'red', marginTop: 0, fontSize: '14px', fontWeight: 'bold' }}>🚨 긴급 로컬 스토리지 원본 추적 패널</h3>
-        <p style={{ fontSize: '11px', color: '#666', marginBottom: '8px' }}>로컬스토리지에 숨겨진 백업이나 옛날 데이터 조각이 남아있는지 확인합니다.</p>
-        <button onClick={() => {
-          const allData: any = {};
-          for (let i = 0; i < localStorage.length; i++) {
-            const key = localStorage.key(i);
-            if (key) allData[key] = localStorage.getItem(key);
-          }
-          const blob = new Blob([JSON.stringify(allData, null, 2)], { type: 'application/json' });
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = 'localstorage_raw_dump.json';
-          a.click();
-        }} style={{ width: '100%', padding: '8px', backgroundColor: 'red', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', marginBottom: '10px' }}>
-          로컬스토리지 RAW 덤프 다운로드
-        </button>
-        <div style={{ fontSize: '11px' }}>
-          {Array.from({ length: localStorage.length }).map((_, idx) => {
-            const key = localStorage.key(idx);
-            if (!key) return null;
-            const val = localStorage.getItem(key) || '';
-            return (
-              <div key={key} style={{ borderBottom: '1px solid #eee', padding: '4px 0', textAlign: 'left' }}>
-                <strong>{key}</strong>: {val.substring(0, 50)}{val.length > 50 ? '...' : ''} ({val.length} bytes)
-              </div>
-            );
-          })}
-        </div>
-      </div>
     </div>
   );
 }
