@@ -772,7 +772,14 @@ export const StorageAPI = {
             console.log('[Rescue] Successfully migrated estimate_clients!');
           } else {
             console.warn('[Rescue] Clients migration error:', error);
-            alert(`[데이터 복구 실패] 거래처 정보(estimate_clients)를 DB로 옮기는 중 오류가 발생했습니다.\n사유: ${error.message} (코드: ${error.code})`);
+            const wantDownload = confirm(
+              `[데이터 복구 실패] 거래처 정보(estimate_clients)를 DB로 옮기는 중 오류가 발생했습니다.\n` +
+              `사유: ${error.message} (코드: ${error.code})\n\n` +
+              `★ 중요: 로컬스토리지에 들어있는 소중한 데이터를 PC 파일로 안전하게 즉시 백업(다운로드)하시겠습니까?`
+            );
+            if (wantDownload) {
+              this.downloadEmergencyBackup();
+            }
           }
         }
       }
@@ -797,7 +804,14 @@ export const StorageAPI = {
             console.log('[Rescue] Successfully migrated estimate_projects!');
           } else {
             console.warn('[Rescue] Projects migration error:', error);
-            alert(`[데이터 복구 실패] 견적 프로젝트(estimate_projects)를 DB로 옮기는 중 오류가 발생했습니다.\n사유: ${error.message} (코드: ${error.code})`);
+            const wantDownload = confirm(
+              `[데이터 복구 실패] 견적 프로젝트(estimate_projects)를 DB로 옮기는 중 오류가 발생했습니다.\n` +
+              `사유: ${error.message} (코드: ${error.code})\n\n` +
+              `★ 중요: 로컬스토리지에 들어있는 소중한 데이터를 PC 파일로 안전하게 즉시 백업(다운로드)하시겠습니까?`
+            );
+            if (wantDownload) {
+              this.downloadEmergencyBackup();
+            }
           }
         }
       }
@@ -822,7 +836,14 @@ export const StorageAPI = {
             console.log('[Rescue] Successfully migrated cost_items!');
           } else {
             console.warn('[Rescue] CostItems migration error:', error);
-            alert(`[데이터 복구 실패] 단가 항목(cost_items)을 DB로 옮기는 중 오류가 발생했습니다.\n사유: ${error.message} (코드: ${error.code})`);
+            const wantDownload = confirm(
+              `[데이터 복구 실패] 단가 항목(cost_items)을 DB로 옮기는 중 오류가 발생했습니다.\n` +
+              `사유: ${error.message} (코드: ${error.code})\n\n` +
+              `★ 중요: 로컬스토리지에 들어있는 소중한 데이터를 PC 파일로 안전하게 즉시 백업(다운로드)하시겠습니까?`
+            );
+            if (wantDownload) {
+              this.downloadEmergencyBackup();
+            }
           }
         }
       }
@@ -846,7 +867,14 @@ export const StorageAPI = {
             console.log('[Rescue] Successfully migrated estimate_daily_reports!');
           } else {
             console.warn('[Rescue] DailyReports migration error:', error);
-            alert(`[데이터 복구 실패] 일일 보고서(estimate_daily_reports)를 DB로 옮기는 중 오류가 발생했습니다.\n사유: ${error.message}`);
+            const wantDownload = confirm(
+              `[데이터 복구 실패] 일일 보고서(estimate_daily_reports)를 DB로 옮기는 중 오류가 발생했습니다.\n` +
+              `사유: ${error.message}\n\n` +
+              `★ 중요: 로컬스토리지에 들어있는 소중한 데이터를 PC 파일로 안전하게 즉시 백업(다운로드)하시겠습니까?`
+            );
+            if (wantDownload) {
+              this.downloadEmergencyBackup();
+            }
           }
         }
       }
@@ -869,7 +897,14 @@ export const StorageAPI = {
             console.log('[Rescue] Successfully migrated cost_packages!');
           } else {
             console.warn('[Rescue] CostPackages migration error:', error);
-            alert(`[데이터 복구 실패] 묶음 패키지(cost_packages)를 DB로 옮기는 중 오류가 발생했습니다.\n사유: ${error.message} (코드: ${error.code})`);
+            const wantDownload = confirm(
+              `[데이터 복구 실패] 묶음 패키지(cost_packages)를 DB로 옮기는 중 오류가 발생했습니다.\n` +
+              `사유: ${error.message} (코드: ${error.code})\n\n` +
+              `★ 중요: 로컬스토리지에 들어있는 소중한 데이터를 PC 파일로 안전하게 즉시 백업(다운로드)하시겠습니까?`
+            );
+            if (wantDownload) {
+              this.downloadEmergencyBackup();
+            }
           }
         }
       }
@@ -890,7 +925,14 @@ export const StorageAPI = {
             console.log('[Rescue] Successfully migrated vendor_info!');
           } else {
             console.warn('[Rescue] VendorInfo migration error:', error);
-            alert(`[데이터 복구 실패] 공급자 서명 정보(vendor_info)를 DB로 옮기는 중 오류가 발생했습니다.\n사유: ${error.message} (코드: ${error.code})`);
+            const wantDownload = confirm(
+              `[데이터 복구 실패] 공급자 서명 정보(vendor_info)를 DB로 옮기는 중 오류가 발생했습니다.\n` +
+              `사유: ${error.message} (코드: ${error.code})\n\n` +
+              `★ 중요: 로컬스토리지에 들어있는 소중한 데이터를 PC 파일로 안전하게 즉시 백업(다운로드)하시겠습니까?`
+            );
+            if (wantDownload) {
+              this.downloadEmergencyBackup();
+            }
           }
         }
       }
@@ -1573,6 +1615,31 @@ export const StorageAPI = {
         throw e;
       }
     }
+  },
+
+  downloadEmergencyBackup(): void {
+    const payload = {
+      projects: JSON.parse(localStorage.getItem('estimate_projects') || '[]'),
+      costItems: JSON.parse(localStorage.getItem('estimate_cost_items') || '[]'),
+      costPackages: JSON.parse(localStorage.getItem('estimate_cost_packages') || '[]'),
+      vendorInfo: JSON.parse(localStorage.getItem('estimate_vendor_info') || 'null'),
+      clients: JSON.parse(localStorage.getItem('estimate_clients') || '[]'),
+      dailyReports: JSON.parse(localStorage.getItem('estimate_daily_reports') || '[]'),
+      exportedAt: new Date().toISOString(),
+      note: "Emergency backup created during Supabase migration failure."
+    };
+    
+    const dataStr = JSON.stringify(payload, null, 2);
+    const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+    
+    const today = new Date();
+    const dateStr = today.toISOString().split('T')[0];
+    const exportFileName = `estimate_emergency_backup_${dateStr}.json`;
+    
+    const linkElement = document.createElement('a');
+    linkElement.setAttribute('href', dataUri);
+    linkElement.setAttribute('download', exportFileName);
+    linkElement.click();
   },
 
   // --- 백업용 내보내기/가져오기 기능 ---
