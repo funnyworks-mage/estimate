@@ -773,6 +773,7 @@ export const StorageAPI = {
             console.log('[Rescue] Successfully migrated estimate_clients!');
           } else {
             console.warn('[Rescue] Clients migration error:', error);
+            alert(`[데이터 복구 실패] 거래처 정보(estimate_clients)를 DB로 옮기는 중 오류가 발생했습니다.\n사유: ${error.message} (코드: ${error.code})`);
           }
         }
       }
@@ -797,6 +798,7 @@ export const StorageAPI = {
             console.log('[Rescue] Successfully migrated estimate_projects!');
           } else {
             console.warn('[Rescue] Projects migration error:', error);
+            alert(`[데이터 복구 실패] 견적 프로젝트(estimate_projects)를 DB로 옮기는 중 오류가 발생했습니다.\n사유: ${error.message} (코드: ${error.code})`);
           }
         }
       }
@@ -821,6 +823,7 @@ export const StorageAPI = {
             console.log('[Rescue] Successfully migrated cost_items!');
           } else {
             console.warn('[Rescue] CostItems migration error:', error);
+            alert(`[데이터 복구 실패] 단가 항목(cost_items)을 DB로 옮기는 중 오류가 발생했습니다.\n사유: ${error.message} (코드: ${error.code})`);
           }
         }
       }
@@ -844,6 +847,7 @@ export const StorageAPI = {
             console.log('[Rescue] Successfully migrated estimate_daily_reports!');
           } else {
             console.warn('[Rescue] DailyReports migration error:', error);
+            alert(`[데이터 복구 실패] 일일 보고서(estimate_daily_reports)를 DB로 옮기는 중 오류가 발생했습니다.\n사유: ${error.message}`);
           }
         }
       }
@@ -868,6 +872,7 @@ export const StorageAPI = {
             console.log('[Rescue] Successfully migrated cost_packages!');
           } else {
             console.warn('[Rescue] CostPackages migration error:', error);
+            alert(`[데이터 복구 실패] 묶음 패키지(cost_packages)를 DB로 옮기는 중 오류가 발생했습니다.\n사유: ${error.message} (코드: ${error.code})`);
           }
         }
       }
@@ -890,6 +895,7 @@ export const StorageAPI = {
             console.log('[Rescue] Successfully migrated vendor_info!');
           } else {
             console.warn('[Rescue] VendorInfo migration error:', error);
+            alert(`[데이터 복구 실패] 공급자 서명 정보(vendor_info)를 DB로 옮기는 중 오류가 발생했습니다.\n사유: ${error.message} (코드: ${error.code})`);
           }
         }
       }
