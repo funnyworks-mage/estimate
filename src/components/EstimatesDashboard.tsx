@@ -8,7 +8,8 @@ import {
   ArrowLeft, 
   Building2, 
   X, 
-  FileText
+  FileText,
+  FileSpreadsheet
 } from 'lucide-react';
 import type { 
   ClientInfo, 
@@ -70,7 +71,8 @@ export default function EstimatesDashboard({
     handleDeleteRow,
     handleOpenLibraryModal,
     handleImportSelectedItems,
-    handleImportSectionsFromProject
+    handleImportSectionsFromProject,
+    handleExportToExcel
   } = estimatesState;
 
   // 로컬 UI/정렬/필터 상태
@@ -339,10 +341,26 @@ export default function EstimatesDashboard({
                   </div>
                 </div>
 
-                {/* 우측 상단 툴바: 인쇄 및 미리보기만 남김 */}
+                {/* 우측 상단 툴바: 인쇄 및 미리보기와 엑셀 다운로드 추가 */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                   <button type="button" className="btn btn-secondary" onClick={() => setIsPreviewModalOpen(true)} style={{ height: '36px' }}>
                     <Eye size={16} /> 인쇄 및 미리보기
+                  </button>
+                  <button 
+                    type="button" 
+                    className="btn btn-success" 
+                    onClick={handleExportToExcel} 
+                    style={{ 
+                      height: '36px',
+                      backgroundColor: '#217346',
+                      borderColor: '#1e683f',
+                      color: '#fff',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px'
+                    }}
+                  >
+                    <FileSpreadsheet size={16} /> 엑셀 다운로드
                   </button>
                 </div>
               </div>

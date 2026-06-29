@@ -7,6 +7,7 @@ import type {
   CostPackage 
 } from '../types/estimate';
 import { StorageAPI, calculateRowAmounts } from '../utils/storage';
+import { exportProjectToExcel } from '../utils/excelExporter';
 
 interface UseEstimateProjectsProps {
   user: any;
@@ -801,6 +802,11 @@ export function useEstimateProjects({ user, libraryItems }: UseEstimateProjectsP
     await updateProjectsState(updatedProjects);
   };
 
+  const handleExportToExcel = () => {
+    if (!activeProject) return;
+    exportProjectToExcel(activeProject, libraryItems);
+  };
+
   return {
     projects,
     setProjects,
@@ -841,6 +847,7 @@ export function useEstimateProjects({ user, libraryItems }: UseEstimateProjectsP
     handleImportPackage,
     handleUpdateProjectStatus,
     handleImportSectionsFromProject,
+    handleExportToExcel,
     updateProjectsState
   };
 }
