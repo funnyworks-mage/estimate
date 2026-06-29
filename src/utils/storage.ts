@@ -1672,6 +1672,15 @@ export const StorageAPI = {
         };
       }
 
+      alert(
+        `[수동 복원 디버그] 파싱 결과 감지된 데이터 수량:\n` +
+        `- 프로젝트(projects): ${parsed.projects ? parsed.projects.length : 0}개\n` +
+        `- 거래처(clients): ${parsed.clients ? parsed.clients.length : 0}개\n` +
+        `- 단가항목(costItems): ${parsed.costItems ? parsed.costItems.length : 0}개\n` +
+        `- 일일보고서(dailyReports): ${parsed.dailyReports ? parsed.dailyReports.length : 0}개\n` +
+        `- 패키지(costPackages): ${parsed.costPackages ? parsed.costPackages.length : 0}개`
+      );
+
       const errors: string[] = [];
       
       // 현재 로그인한 사용자 세션 정보 가져오기
