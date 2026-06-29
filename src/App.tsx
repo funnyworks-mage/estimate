@@ -101,15 +101,18 @@ export default function App() {
     if (isMasterEmail) {
       setUserRole('super_admin');
       try {
-        await supabase
+        const { error } = await supabase
           .from('user_profiles')
           .upsert({
             id: userId,
             email: email,
             role: 'super_admin'
           });
-      } catch (dbErr) {
-        console.error('마스터 권한 DB 동기화 실패:', dbErr);
+        if (error) {
+          alert(`[권한 동기화 실패] user_profiles 테이블에 super_admin 역할을 반영하지 못했습니다.\n사유: ${error.message} (코드: ${error.code})`);
+        }
+      } catch (dbErr: any) {
+        alert(`[권한 동기화 예외] DB 통신 중 오류가 발생했습니다.\n사유: ${dbErr.message}`);
       }
       setIsLoading(false);
       return;
