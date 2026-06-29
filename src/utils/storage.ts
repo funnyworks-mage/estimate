@@ -762,8 +762,8 @@ export const StorageAPI = {
             const cleaned = { ...c };
             if (currentUserId) {
               cleaned.created_by = currentUserId;
-              cleaned.createdBy = currentUserId;
             }
+            delete cleaned.createdBy;
             return cleaned;
           });
           const { error } = await supabase.from('estimate_clients').upsert(sanitized);
@@ -787,8 +787,8 @@ export const StorageAPI = {
             const cleaned = { ...p };
             if (currentUserId) {
               cleaned.created_by = currentUserId;
-              cleaned.createdBy = currentUserId;
             }
+            delete cleaned.createdBy;
             return cleaned;
           });
           const { error } = await supabase.from('estimate_projects').upsert(sanitized);
@@ -812,8 +812,8 @@ export const StorageAPI = {
             const cleaned = { ...i };
             if (currentUserId) {
               cleaned.created_by = currentUserId;
-              cleaned.createdBy = currentUserId;
             }
+            delete cleaned.createdBy;
             return cleaned;
           });
           const { error } = await supabase.from('cost_items').upsert(sanitized);
@@ -861,8 +861,8 @@ export const StorageAPI = {
             const cleaned = { ...p };
             if (currentUserId) {
               cleaned.created_by = currentUserId;
-              cleaned.createdBy = currentUserId;
             }
+            delete cleaned.createdBy;
             return cleaned;
           });
           const { error } = await supabase.from('cost_packages').upsert(sanitized);
@@ -885,8 +885,8 @@ export const StorageAPI = {
           const cleaned = { ...localVendor };
           if (currentUserId) {
             cleaned.created_by = currentUserId;
-            cleaned.createdBy = currentUserId;
           }
+          delete cleaned.createdBy;
           const payload = { id: 'default_vendor', ...cleaned };
           const { error } = await supabase.from('vendor_info').upsert(payload);
           if (!error) {
@@ -1641,11 +1641,8 @@ export const StorageAPI = {
           const cleaned = { ...client };
           if (currentUserId) {
             cleaned.created_by = currentUserId;
-            cleaned.createdBy = currentUserId;
-          } else {
-            delete cleaned.created_by;
-            delete cleaned.createdBy;
           }
+          delete cleaned.createdBy;
           return cleaned;
         });
         if (await checkSupabaseAccess()) {
@@ -1670,12 +1667,9 @@ export const StorageAPI = {
           // 백업 데이터 내의 생성자 ID가 현재 로그인한 유저와 매칭되도록 보정
           // 외래키(auth.users) 위반 에러 방지 목적
           if (currentUserId) {
-            cleaned.createdBy = currentUserId;
             cleaned.created_by = currentUserId;
-          } else {
-            delete cleaned.createdBy;
-            delete cleaned.created_by;
           }
+          delete cleaned.createdBy;
           return cleaned;
         });
         
@@ -1695,12 +1689,9 @@ export const StorageAPI = {
         const proj = parsed.projects;
         const cleaned = { ...proj };
         if (currentUserId) {
-          cleaned.createdBy = currentUserId;
           cleaned.created_by = currentUserId;
-        } else {
-          delete cleaned.createdBy;
-          delete cleaned.created_by;
         }
+        delete cleaned.createdBy;
         if (await checkSupabaseAccess()) {
           try {
             const { error } = await supabase
@@ -1721,11 +1712,8 @@ export const StorageAPI = {
           const cleaned = { ...item };
           if (currentUserId) {
             cleaned.created_by = currentUserId;
-            cleaned.createdBy = currentUserId;
-          } else {
-            delete cleaned.created_by;
-            delete cleaned.createdBy;
           }
+          delete cleaned.createdBy;
           return cleaned;
         });
         if (await checkSupabaseAccess()) {
@@ -1748,11 +1736,8 @@ export const StorageAPI = {
           const cleaned = { ...pkg };
           if (currentUserId) {
             cleaned.created_by = currentUserId;
-            cleaned.createdBy = currentUserId;
-          } else {
-            delete cleaned.created_by;
-            delete cleaned.createdBy;
           }
+          delete cleaned.createdBy;
           return cleaned;
         });
         if (await checkSupabaseAccess()) {
@@ -1774,11 +1759,8 @@ export const StorageAPI = {
         const cleanedVendor = { ...parsed.vendorInfo };
         if (currentUserId) {
           cleanedVendor.created_by = currentUserId;
-          cleanedVendor.createdBy = currentUserId;
-        } else {
-          delete cleanedVendor.created_by;
-          delete cleanedVendor.createdBy;
         }
+        delete cleanedVendor.createdBy;
         if (await checkSupabaseAccess()) {
           try {
             const payload = { id: 'default_vendor', ...cleanedVendor };
